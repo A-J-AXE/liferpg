@@ -72,11 +72,8 @@ try {
   await page.getByText("DAY PLANNING PREVIEW").waitFor();
 
   // Dark theme uses production semantic tokens.
-  await page.evaluate(() => {
-    const state = JSON.parse(localStorage.getItem("lifeos") || "{}");
-    state.theme = "Black";
-    localStorage.setItem("lifeos", JSON.stringify(state));
-  });
+  // Switch themes through the real LifeOS control, preserving the complete stored workspace.
+  await page.locator("#theme").click();
   await page.reload();
   await page.locator("html.black").waitFor();
   await page.getByRole("heading", { name: "Desktop design system" }).waitFor();
