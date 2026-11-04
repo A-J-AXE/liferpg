@@ -1826,3 +1826,14 @@ lifeos-showcase {display:block;min-width:0;}
 @media(prefers-reduced-motion:reduce) {
   #screen .up-draggable,#screen .up-column {scroll-behavior:auto;transition:none;}
 }
+
+/* Keep the Completed disclosure compact and remove the browser's native list numbering. */
+#screen .up-completed summary {
+  list-style:none;display:flex;align-items:center;gap:6px;min-height:28px;
+  font-size:11px;color:var(--muted);cursor:pointer;
+}
+#screen .up-completed summary::-webkit-details-marker {display:none;}
+#screen .up-completed summary::before {content:"›";font-size:15px;line-height:1;transform-origin:center;transition:transform var(--lo-motion-fast,120ms);}
+#screen .up-completed[open] summary::before {transform:rotate(90deg);}
+#screen .up-completed summary:focus-visible {outline:2px solid var(--accent);outline-offset:2px;}
+@media(prefers-reduced-motion:reduce){#screen .up-completed summary::before{transition:none;}}
