@@ -77,6 +77,6 @@ export function upcomingHTML({tasks,mode,anchor,today,renderTask}) {
     '</div></section>';
   }).join("");
   return '<section class="upcoming-workspace"><div class="up-toolbar"><div class="up-tabs" role="group" aria-label="Upcoming view">'+tabs+'</div>'+
-    '<div class="up-navigation"><button type="button" data-act="upPrev" aria-label="Previous periods">‹</button><button type="button" data-act="upToday">Today</button><button type="button" data-act="upNext" aria-label="Next periods">›</button></div></div>'+
+    ''+(selected === "Overview" ? "" : '<div class="up-navigation"><button type="button" data-act="upPrev" aria-label="Previous periods">‹</button><button type="button" data-act="upToday">Today</button><button type="button" data-act="upNext" aria-label="Next periods">›</button></div>')+'</div>'+
     '<div class="up-scroller"><div class="up-board">'+board+'</div></div></section>';
 }
