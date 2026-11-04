@@ -19,8 +19,8 @@
 - [ ] A17 **Editable title** Edit the title inline. Reflect the saved title wherever that task is shown.
 - [ ] A18 **Description** Keep longer notes in a separate description field, available when reopening the task.
 - [x] A19 **Importance selector** Offer exactly five labeled choices: None, Low, Medium, High and Goal. Expose the selected label to keyboard and screen-reader users.
-- [ ] A20 **Goal color** Use a fine multicolor accent for Goal, visible on the row and completion control.
-- [ ] A21 **Goal outline** Run the gradient around the row perimeter, with a violet-to-warm transition and a quiet interior. Keep title text legible.
+- [x] A20 **Goal color** Use a fine multicolor accent for Goal, visible on the row and completion control.
+- [x] A21 **Goal outline** Run the gradient around the row perimeter, with a violet-to-warm transition and a quiet interior. Keep title text legible.
 - [ ] A22 **High** Use red for the High priority indicator.
 - [ ] A23 **Medium** Use yellow for Medium, with sufficient contrast on the light canvas.
 - [ ] A24 **Low** Use green for Low.
@@ -44,7 +44,7 @@
 - [x] A42 **Habit rewards** Link each habit to a skill and show the XP and coin value of its check-in. Record the occurrence so checking in twice cannot pay twice.
 - [ ] A43 **Growth, Battle and Goals tiles** Use original illustrated entry points to good habits, bad habits and objectives. Each opens the relevant list and today's available actions.
 - [ ] A44 **Projects, Market and Journal tiles** Open project stages, the personal reward shop and activity history from compact tiles. Surface Settings and Profile / Vision Board alongside them.
-- [ ] A45 **Dimensional level bar** Use a shallow inset track, a lit edge and a brief fill animation when XP lands. Keep numeric progress visible and support reduced motion.
+- [x] A45 **Dimensional level bar** Use a shallow inset track, a lit edge and a brief fill animation when XP lands. Keep numeric progress visible and support reduced motion.
 - [x] A46 **Skill points** Give every skill its own points total and progress meter. Show the source and amount of each gain. Review separately whether points can be spent.
 - [x] A47 **Skills on Overview** Show a compact, scannable skill list on the main dashboard. Open a skill to see its projects, habits and recent XP.
 - [x] A48 **Character on Overview** Display a compact version of the same character profile on the dashboard; keep identity, level and balance consistent across views.
@@ -60,3 +60,5 @@
 The normal Electron launch showed Overview and Today. npm run verify exercises a task with uploaded artwork and subtasks, edit/undo rewards, calendar ranges, habit check-ins, diary, themes, narrow layout and a real workout saved from a guest routine. The workout appeared in native History and earned one Gym receipt. node verify-sync.mjs checks that two independent hosted clients see each other’s changes, data survives a server restart, and simultaneous stale saves cannot overwrite newer data.
 
 The upstream baseline on this Windows host was 7,811 frontend tests passed / 21 failed, and 769 API tests passed / 31 failed. Examples include POSIX permission and launcher assumptions, generated file comparisons, and UI assertions. These failures were observed on the initial unchanged import. Real Google OAuth, calendar lock/release, notification delivery, deployed booking links, DGX containers, and pairing an actual iPhone still require live verification. Review unchecked annotations individually; working controls alone do not establish all their acceptance criteria.
+
+Phase 6: the official shadcn Sidebar and Progress are in the live planner. Task search uses Command, and task dates support Popover + Calendar. The fixture at /design-system exercises the same component source in both themes. AGENTS.md defines the registry workflow. See docs/DESIGN_SYSTEM.md for scope and remaining migrations.

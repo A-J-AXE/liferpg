@@ -48,7 +48,7 @@ try {
     phone = await (await session()).newPage();
   await pc.goto(url);
   await phone.goto(url);
-  await pc.getByText("＋ New project", { exact: true }).click();
+  await pc.getByRole("button", { name: "New project", exact: true }).click();
   await pc.getByLabel("Project name").fill("Shared project");
   await pc.getByLabel("Linked skill").fill("Robotics");
   await pc.getByRole("button", { name: "Save", exact: true }).click();

@@ -20,3 +20,9 @@ See CHECKLIST.md for requirement status. Marked entries are verified; unchecked 
 For a fresh checkout, run npm ci in the root as well as in fitness/api and fitness/frontend. Install the Electron binary with node node_modules/electron/install.js and launch with npm run desktop. To verify with Edge, run npm run verify. On other systems set LIFEOS_BROWSER to your Chromium executable.
 
 For DGX Spark Docker deployment, iPhone pairing, planner sync, MCP over SSH, and volume backups, follow [the personal server guide](SELFHOST.md). Run node verify-sync.mjs to check independent device sessions, restart persistence, and conflict detection on the development machine.
+
+## Planner UI
+
+Open Settings → UI showcase or visit http://127.0.0.1:4310/design-system after starting LifeOS. The preview uses the same sidebar, typography and theme as the planner. Its sample task is separate from your records.
+
+Read [the design system](docs/DESIGN_SYSTEM.md) before editing the frontend. Use the official shadcn registry through MCP. From this directory run `npm run typecheck` and `npm run build:ui` after changing a component. Commit the generated assets so the desktop and Docker entry points serve the same version.

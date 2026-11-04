@@ -6,6 +6,10 @@ import { availability } from "./booking.mjs";
 import { readFile } from "node:fs/promises";
 const files = {
   "/": "index.html",
+  "/shell.js": "shell.js",
+  "/design-system": "index.html",
+  "/shadcn-license.txt": "ui/SHADCN-LICENSE.txt",
+  "/components.css": "components.css",
   "/app.js": "app.js",
   "/style.css": "style.css",
 };
@@ -47,7 +51,9 @@ http
           ? "text/javascript"
           : name.endsWith("css")
             ? "text/css"
-            : "text/html",
+            : name.endsWith(".txt")
+              ? "text/plain"
+              : "text/html",
       );
       res.end(data);
     } catch {

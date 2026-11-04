@@ -1,0 +1,17 @@
+@import "tailwindcss" source(none);
+@source "./";
+@custom-variant dark (&:is(.black *));
+@theme inline {
+  --color-background: var(--bg); --color-foreground: var(--ink);
+  --color-card: var(--panel); --color-card-foreground: var(--ink);
+  --color-popover: var(--panel); --color-popover-foreground: var(--ink);
+  --color-primary: var(--accent); --color-primary-foreground: var(--panel);
+  --color-secondary: var(--tint); --color-secondary-foreground: var(--ink);
+  --color-muted: var(--grid); --color-muted-foreground: var(--muted);
+  --color-accent: var(--tint); --color-accent-foreground: var(--accent);
+  --color-destructive: var(--high); --color-border: var(--line); --color-input: var(--line); --color-ring: var(--accent);
+  --color-sidebar: var(--rail); --color-sidebar-foreground: var(--ink); --color-sidebar-accent: var(--tint);
+  --color-sidebar-accent-foreground: var(--accent); --color-sidebar-border: var(--line); --color-sidebar-ring: var(--accent);
+  --color-sidebar-primary: var(--accent); --color-sidebar-primary-foreground: var(--panel);
+}
+

@@ -1,3 +1,4 @@
+import { searchTasks, renderSidebar } from "/shell.js";
 const $ = (s) => document.querySelector(s);
 const safe = (v) =>
   String(v ?? "").replace(
@@ -33,7 +34,8 @@ let state = JSON.parse(localStorage.getItem("lifeos") || "null") || defaults;
 const gymURL = window.lifeosHosted
   ? location.origin + "/gym/"
   : "http://127.0.0.1:5173/";
-let view = "Overview",
+let view =
+    location.pathname === "/design-system" ? "Design system" : "Overview",
   date = now,
   range = "Day";
 const project = (k) => state.projects.find((p) => p.id === k);
@@ -137,6 +139,12 @@ function dialog(title, html, submit) {
       alert(err.message);
     }
   };
+  $("#modal").setAttribute("aria-labelledby", "editor-title");
+  $("#form h2").id = "editor-title";
+  $("#form").classList.toggle(
+    "task-editor",
+    title === "Edit task" || title === "New task",
+  );
   $("#modal").showModal();
 }
 async function picture(file) {
@@ -164,6 +172,7 @@ function projectForm(p) {
     "Project studio",
     field("name", "Project name", "text", p?.name, "required") +
       field("folder", "Sidebar folder", "text", p?.folder) +
+      field("color", "Project color", "color", p?.color || "#74669e") +
       select(
         "stage",
         "Stage",
@@ -178,6 +187,7 @@ function projectForm(p) {
         id: p?.id || id(),
         name: f.name.trim(),
         folder: f.folder.trim(),
+        color: f.color,
         stage: f.stage,
         skill: f.skill.trim(),
         image: (await picture(f.photo)) || p?.image || "",
@@ -210,6 +220,7 @@ function taskForm(t) {
         "date",
         t?.date ?? (view === "Inbox" ? "" : date),
       ) +
+      "<task-date-picker></task-date-picker>" +
       field("time", "Start time", "time", t?.time) +
       field(
         "minutes",
@@ -303,11 +314,15 @@ function row(t) {
     safe(t.priority) +
     " · " +
     t.minutes +
-    "m · " +
-    t.children.filter((s) => s.done).length +
-    "/" +
-    t.children.length +
-    " subtasks</div>" +
+    "m" +
+    (t.children.length
+      ? " · " +
+        t.children.filter((s) => s.done).length +
+        "/" +
+        t.children.length +
+        " subtasks"
+      : "") +
+    "</div>" +
     t.children
       .map(
         (s, i) =>
@@ -386,80 +401,165 @@ function shift(n) {
   if (view === "Today" || view === "Overview") view = "Agenda";
   render();
 }
+// Local calendar coordinates: minutes since midnight; one shared scale across days.
 function calendar() {
-  let d = new Date(date + "T12:00");
-  let days = range === "Week" ? 7 : parseInt(range) || 1;
-  if (range === "Month") {
-    d.setDate(1);
-    days = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  const first = new Date(date + "T12:00"),
+    month = range === "Month",
+    count = month
+      ? new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
+      : range === "Week"
+        ? 7
+        : parseInt(range) || 1;
+  if (month) first.setDate(1);
+  const days = Array.from({ length: count }, (_, i) => {
+    const d = new Date(first);
+    d.setDate(d.getDate() + i);
+    return {
+      d,
+      key: day(d),
+      tasks: state.tasks
+        .filter((t) => !t.trashed && t.date === day(d) && t.time)
+        .sort((a, b) => a.time.localeCompare(b.time)),
+    };
+  });
+  const mins = (t) =>
+    Number(t.time.slice(0, 2)) * 60 + Number(t.time.slice(3, 5));
+  const all = days.flatMap((d) => d.tasks);
+  const start = Math.min(8, ...all.map((t) => Math.floor(mins(t) / 60))),
+    end = Math.min(
+      24,
+      Math.max(
+        19,
+        ...all.map((t) => Math.ceil((mins(t) + Number(t.minutes)) / 60)),
+      ),
+    );
+  const hours = Array.from({ length: end - start }, (_, i) => start + i);
+  const time = (n) =>
+    String(Math.floor(n / 60)).padStart(2, "0") +
+    ":" +
+    String(n % 60).padStart(2, "0");
+  function block(t, pos = "") {
+    const p = project(t.project),
+      color = /^#[0-9a-f]{6}$/i.test(p?.color) ? p.color : "var(--accent)";
+    const name =
+      t.time +
+      " · " +
+      t.title +
+      " · " +
+      t.minutes +
+      " min" +
+      (p ? " · " + p.name : "");
+    return button(
+      '<span class="block-title">' +
+        image(p) +
+        safe(t.title) +
+        '</span><span class="block-time">' +
+        t.time +
+        " · " +
+        Number(t.minutes) +
+        "m</span>",
+      "edit",
+      t.id,
+      'class="time-block" aria-label="' +
+        safe(name) +
+        '" title="' +
+        safe(name) +
+        '" style="--project:' +
+        color +
+        ";" +
+        pos +
+        '"',
+    );
   }
-  let rows = "";
-  for (let i = 0; i < days; i++, d.setDate(d.getDate() + 1)) {
-    let ds = day(d);
-    let scheduled = state.tasks
-      .filter((t) => !t.trashed && t.date === ds && t.time)
-      .sort((a, b) => a.time.localeCompare(b.time));
-    if (days > 1) {
-      rows +=
-        '<div class="slot" data-date="' +
-        ds +
-        '"><small>' +
-        ds.slice(5) +
-        "</small>" +
-        scheduled
-          .map((t) =>
-            button(
-              image(project(t.project)) + t.time + " " + safe(t.title),
-              "edit",
-              t.id,
-            ),
-          )
-          .join("") +
-        "</div>";
-      continue;
+  // Give simultaneous events their own lanes until the overlap group clears.
+  function timed(tasks) {
+    let result = "",
+      group = [],
+      ends = [];
+    const flush = () => {
+      const width = 100 / ends.length;
+      for (const { t, lane, at, duration } of group)
+        result += block(
+          t,
+          "top:calc(" +
+            (at - start * 60) / 60 +
+            " * var(--hour));height:calc(" +
+            duration / 60 +
+            " * var(--hour));left:calc(" +
+            lane * width +
+            "% + 2px);width:calc(" +
+            width +
+            "% - 4px)",
+        );
+      group = [];
+      ends = [];
+    };
+    for (const t of tasks) {
+      const at = mins(t),
+        duration = Math.min(1440 - at, Math.max(1, Number(t.minutes) || 30));
+      if (ends.length && Math.max(...ends) <= at) flush();
+      let lane = ends.findIndex((x) => x <= at);
+      if (lane < 0) lane = ends.length;
+      ends[lane] = at + duration;
+      group.push({ t, lane, at, duration });
     }
-    let hours = [
-      ...new Set([
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15,
-        16,
-        17,
-        18,
-        ...scheduled.map((t) => Number(t.time.slice(0, 2))),
-      ]),
-    ].sort((a, b) => a - b);
-    rows += hours
-      .map(
-        (h) =>
-          '<div class="slot" data-date="' +
-          ds +
-          '" data-hour="' +
-          h +
-          '"><small>' +
-          String(h).padStart(2, "0") +
-          ":00</small>" +
-          scheduled
-            .filter((t) => Number(t.time.slice(0, 2)) === h)
-            .map((t) =>
-              button(
-                image(project(t.project)) + safe(t.title) + " · " + t.time,
-                "edit",
-                t.id,
-              ),
-            )
-            .join("") +
-          "</div>",
-      )
-      .join("");
+    if (group.length) flush();
+    return result;
   }
+  const grid = month
+    ? '<div class="calendar-scroll"><div class="month-board">' +
+      ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        .map((x) => "<b>" + x + "</b>")
+        .join("") +
+      days
+        .map(
+          ({ d, key, tasks }, i) =>
+            '<div class="slot month-day" data-date="' +
+            key +
+            '" style="' +
+            (!i ? "grid-column:" + (((d.getDay() + 6) % 7) + 1) : "") +
+            '"><strong>' +
+            d.getDate() +
+            "</strong>" +
+            tasks.map((t) => block(t)).join("") +
+            "</div>",
+        )
+        .join("") +
+      "</div></div>"
+    : '<div class="calendar-scroll"><div class="time-board" style="--days:' +
+      count +
+      '"><div class="time-axis"><div class="date-cap">Local</div>' +
+      hours.map((h) => "<time>" + time(h * 60) + "</time>").join("") +
+      "</div>" +
+      days
+        .map(
+          ({ key, d, tasks }) =>
+            '<div><div class="date-cap">' +
+            safe(
+              d.toLocaleDateString(undefined, {
+                weekday: "short",
+                day: "numeric",
+              }),
+            ) +
+            '</div><div class="day-column">' +
+            hours
+              .map(
+                (h) =>
+                  '<div class="slot hour" data-hour="' +
+                  h +
+                  '" data-date="' +
+                  key +
+                  '"></div>',
+              )
+              .join("") +
+            '<div class="event-layer">' +
+            timed(tasks) +
+            "</div></div></div>",
+        )
+        .join("") +
+      "</div></div>";
   return (
-    '<div class="card"><h2>Calendar</h2><div class="bar">' +
+    '<section class="card calendar-card"><div class="bar calendar-head"><h2>Calendar</h2>' +
     button("‹", "prev") +
     button("Today", "reset") +
     button("›", "next") +
@@ -467,54 +567,79 @@ function calendar() {
     ["Day", "2 days", "3 days", "4 days", "5 days", "6 days", "Week", "Month"]
       .map(
         (v) =>
-          "<option " + (v === range ? "selected" : "") + ">" + v + "</option>",
+          "<option " + (range === v ? "selected" : "") + ">" + v + "</option>",
       )
       .join("") +
     "</select></div>" +
     googleAgenda() +
-    rows +
-    "</div>"
+    grid +
+    "</section>"
+  );
+}
+function meter(label, xp, limit) {
+  const value = xp % limit;
+  return (
+    '<xp-meter data-label="' +
+    safe(label) +
+    '" data-total="' +
+    xp +
+    '" data-value="' +
+    value +
+    '" data-max="' +
+    limit +
+    '"></xp-meter><div class="meter-scale"><span>' +
+    value +
+    " / " +
+    limit +
+    " XP</span><span>Next level</span></div>"
   );
 }
 function skills() {
+  const limit = state.config?.threshold || 100;
   return state.skills
-    .map(
-      (s) =>
-        "<p>" +
+    .map((s) => {
+      const xp = total("xp", s);
+      return (
+        '<div class="skill-meter"><div class="meter-head">' +
         button(safe(s), "nav", "Skill / " + s) +
-        " · Lv " +
-        (1 + Math.floor(total("xp", s) / (state.config?.threshold || 100))) +
-        '<progress max="' +
-        (state.config?.threshold || 100) +
-        '" value="' +
-        (total("xp", s) % (state.config?.threshold || 100)) +
-        '"></progress>' +
-        total("xp", s) +
-        " XP</p>",
-    )
+        "<span>Lv " +
+        (1 + Math.floor(xp / limit)) +
+        "</span></div>" +
+        meter(s, xp, limit) +
+        "</div>"
+      );
+    })
     .join("");
 }
 function summary() {
-  return (
-    '<section class="summary"><div class="card"><h2>' +
-    image({ image: state.config?.portrait }) +
-    safe(state.profile) +
-    "</h2>Level " +
-    (1 + Math.floor(total("xp") / (state.config?.threshold || 100))) +
-    " · " +
-    total("xp") +
-    " XP · " +
-    (total("coins") - state.spent) +
-    ' coins<progress max="' +
-    (state.config?.threshold || 100) +
-    '" value="' +
-    (total("xp") % (state.config?.threshold || 100)) +
-    '"></progress>HP ' +
-    Math.max(
+  const limit = state.config?.threshold || 100,
+    xp = total("xp"),
+    hp = Math.max(
       0,
       100 - (state.battles || []).reduce((n, b) => n + b.log.length, 0),
+    );
+  return (
+    '<section class="summary"><div class="card character"><h4>Character</h4><h2>' +
+    button(
+      image({ image: state.config?.portrait }) + safe(state.profile),
+      "nav",
+      "Profile",
     ) +
-    '/100</div><div class="card"><h2>Skills</h2>' +
+    "</h2>" +
+    (state.config?.objective
+      ? "<p>" + safe(state.config.objective) + "</p>"
+      : "") +
+    '<div class="meter-head"><strong>Level ' +
+    (1 + Math.floor(xp / limit)) +
+    "</strong><span>" +
+    xp +
+    " total XP</span></div>" +
+    meter("Character progress", xp, limit) +
+    '<div class="vitals"><span>' +
+    (total("coins") - state.spent) +
+    " coins</span><span>" +
+    hp +
+    ' / 100 HP</span></div></div><div class="card"><h2>Skills</h2>' +
     skills() +
     '</div><div class="card"><h2>Daily check-in</h2>' +
     button(
@@ -550,46 +675,20 @@ function habits() {
 }
 function render() {
   document.documentElement.classList.toggle("black", state.theme === "Black");
-  $("#theme").textContent = "◐  " + state.theme + " mode";
-  let nav = [
-    "Overview",
-    "Inbox",
-    "Today",
-    "Tasks",
-    "Projects",
-    "openGym",
-    "Skills",
-    "Habits",
-    "Diary",
-    "Market",
-    "Settings",
-  ];
-  $("#nav").innerHTML = nav
-    .map((x) =>
-      button(
-        x +
-          (x === "Inbox"
-            ? " · " + state.tasks.filter((t) => !t.date && !t.done).length
-            : ""),
-        "nav",
-        x,
-        'class="' + (view === x ? "active" : "") + '"',
-      ),
-    )
-    .join("");
-  $("#projects").innerHTML = Array.from(
-    new Set(state.projects.map((p) => p.folder || "")),
-  )
-    .map(
-      (folder) =>
-        (folder ? "<h4>" + safe(folder) + "</h4>" : "") +
-        state.projects
-          .filter((p) => (p.folder || "") === folder)
-          .map((p) => button(image(p) + safe(p.name), "nav", p.id))
-          .join(""),
-    )
-    .join("");
-  let body = extendedPage();
+  renderSidebar({
+    view,
+    projects: state.projects,
+    count: state.tasks.filter((t) => !t.date && !t.done && !t.trashed).length,
+    theme: state.theme,
+    onTheme: toggleTheme,
+    onProject: () => projectForm(),
+    lists: listFilters,
+  });
+  document.documentElement.dataset.effects = state.config?.effect || "on";
+  let body =
+    view === "Design system"
+      ? "<lifeos-showcase></lifeos-showcase>"
+      : extendedPage();
   if (body !== null) {
   } else if (view === "openGym")
     body =
@@ -634,6 +733,7 @@ function render() {
   else if (view === "Settings")
     body =
       button("Edit profile", "profile") +
+      '<p><a href="/design-system">UI showcase</a></p>' +
       settingsPlus() +
       googleSettings() +
       availabilityPanel() +
@@ -653,13 +753,23 @@ function render() {
         .join("");
   else
     body =
-      '<div class="grid">' +
-      agenda() +
-      calendar() +
-      "</div>" +
-      (view === "Overview"
-        ? summary() + fitnessSummary() + habits() + contentHub()
-        : "");
+      view === "Overview"
+        ? '<div class="grid desk"><div class="agenda-stack">' +
+          agenda() +
+          summary() +
+          "</div>" +
+          calendar() +
+          '</div><section class="review-grid"><div>' +
+          fitnessSummary() +
+          '</div><div class="card"><h2>Habits</h2>' +
+          habits() +
+          "</div></section>" +
+          contentHub()
+        : '<div class="grid">' + agenda() + calendar() + "</div>";
+  if (view === "Design system" && $("#screen lifeos-showcase")) {
+    tick();
+    return;
+  }
   $("#screen").innerHTML =
     '<div class="hero"><small>' +
     new Date(date + "T12:00")
@@ -803,11 +913,11 @@ document.addEventListener("drop", (e) => {
     save();
   }
 });
-$("#theme").onclick = () => {
+function toggleTheme() {
   state.theme = state.theme === "Light" ? "Black" : "Light";
   save();
-};
-$("#newProject").onclick = () => projectForm();
+}
+
 function tick() {
   let t = state.timer;
   let left = t.end
@@ -870,6 +980,7 @@ document.addEventListener("keydown", (e) => {
     e.key.toLowerCase() === "c" &&
     !e.ctrlKey &&
     !e.metaKey &&
+    !document.querySelector('[role="dialog"][data-state="open"]') &&
     !$("#modal").open &&
     !e.target.matches("input,textarea,select")
   ) {
@@ -1556,33 +1667,25 @@ function inList(t) {
   return true;
 }
 function findTask() {
-  dialog(
-    "Find a task",
-    field("search", "Search by title or project", "search", "") +
-      '<div id="matches"></div>',
-    () => {},
+  searchTasks(
+    state.tasks
+      .filter((t) => !t.trashed)
+      .map((t) => ({
+        id: t.id,
+        title: t.title,
+        projectName: project(t.project)?.name || "Personal",
+      })),
+    (id) => {
+      const t = state.tasks.find((t) => t.id === id);
+      if (t) taskForm(t);
+    },
   );
-  const input = $("[name=search]");
-  input.oninput = () => {
-    $("#matches").innerHTML = state.tasks
-      .filter(
-        (t) =>
-          !t.trashed &&
-          (t.title + " " + (project(t.project)?.name || ""))
-            .toLowerCase()
-            .includes(input.value.toLowerCase()),
-      )
-      .slice(0, 15)
-      .map((t) => button(safe(t.title), "found", t.id, 'type="button"'))
-      .join("");
-  };
-  input.oninput();
-  input.focus();
 }
 document.addEventListener("keydown", (e) => {
   if (
     (e.ctrlKey || e.metaKey) &&
     e.key.toLowerCase() === "k" &&
+    !document.querySelector('[role="dialog"][data-state="open"]') &&
     !$("#modal").open
   ) {
     e.preventDefault();
@@ -1963,7 +2066,7 @@ setInterval(tick, 1000);
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
-  if (b.dataset.act === "switchTheme") $("#theme").click();
+  if (b.dataset.act === "switchTheme") toggleTheme();
   if (b.dataset.act === "assign") {
     const t = state.tasks.find((t) => t.id === b.dataset.key);
     dialog(
