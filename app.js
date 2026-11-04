@@ -36,7 +36,7 @@ const gymURL = window.lifeosHosted
   ? location.origin + "/gym/"
   : "http://127.0.0.1:5173/";
 let view =
-    location.pathname === "/design-system" ? "Design system" : "Overview",
+    location.pathname === "/design-system" ? "Design system" : "Planner",
   date = now,
   range = "Day",
   upcomingMode = "Overview",
@@ -238,6 +238,7 @@ function taskForm(t) {
         priorities.map((x) => [x, x]),
         t?.priority || "None",
       ) +
+      '<details class="task-advanced"><summary>More options</summary>' +
       area("notes", "Description", t?.notes) +
       field("tags", "Tags", "text", t?.tags) +
       field("location", "Location", "text", t?.location) +
@@ -246,7 +247,7 @@ function taskForm(t) {
         "children",
         "Subtasks (one per line)",
         t?.children.map((s) => s.title).join("\n"),
-      ),
+      ) + "</details>",
     async (f) => {
       let file = f.removeFile ? null : t?.file;
       if (f.attachment?.size) {

@@ -1338,3 +1338,17 @@ task-date-picker {
 .row[data-task]:hover .mini-plan,.row[data-task]:focus-within .mini-plan,
 .row[data-task] .mini-plan:focus-visible {opacity:1;border-color:var(--line);background:var(--panel);}
 .row[data-task] .mini-plan:focus-visible {outline:2px solid var(--accent);outline-offset:1px;}
+
+/* Compact application header and progressive task composer. */
+main > header { min-height:40px;padding:0 0 9px;gap:8px; }
+main > header .global-search { display:inline-flex;align-items:center;gap:10px;max-width:180px;font-size:12px;color:var(--muted);background:transparent;border:1px solid var(--line);padding:4px 9px; }
+.global-search kbd {margin-left:auto;font-size:10px;opacity:.7;font-family:inherit;}
+main > header #timer {margin-left:auto;}
+.task-editor { display:flex;flex-direction:column;gap:8px; }
+.task-editor > h2 { font:600 18px "Segoe UI",system-ui,sans-serif;margin-bottom:2px; }
+.task-editor > label { margin:0; }
+.task-editor > label input,.task-editor > label select {min-height:34px;}
+.task-advanced {border-top:1px solid var(--line);padding-top:8px;margin-top:6px;}
+.task-advanced summary {font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;outline-offset:3px;}
+.task-advanced[open] {display:flex;flex-direction:column;gap:8px;}
+.task-advanced label {margin:0;}
