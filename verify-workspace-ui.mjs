@@ -1,0 +1,60 @@
+import { chromium } from "playwright-core";
+import { spawn } from "node:child_process";
+import { mkdir } from "node:fs/promises";
+import assert from "node:assert/strict";
+const server=spawn(process.execPath,["server.mjs"],{stdio:"inherit"});
+let browser;
+try {
+  let online=false;
+  for(let i=0;i<80;i++){try{online=(await fetch("http://127.0.0.1:4310",{signal:AbortSignal.timeout(500)})).ok;if(online)break;}catch{} await new Promise(r=>setTimeout(r,200));}
+  if(!online)throw Error("Server unavailable");
+  browser=await chromium.launch({executablePath:process.env.LIFEOS_BROWSER||"/usr/bin/google-chrome",args:["--no-sandbox","--no-proxy-server"]});
+  const p=await browser.newPage({viewport:{width:1280,height:850},serviceWorkers:"block"});
+  p.setDefaultTimeout(12000);
+  const errors=[];p.on("pageerror",e=>errors.push(e.message));
+  const nav=name=>p.locator("#nav").getByRole("button",{name,exact:true}).click();
+  await p.goto("http://127.0.0.1:4310");
+  await p.locator(".planner-layout .time-board").waitFor();
+  await p.locator("#range").selectOption("3 days");
+  assert.equal(await p.locator(".time-board .day-column").count(),3);
+  await mkdir("workspace-screenshots",{recursive:true});
+  await p.screenshot({path:"workspace-screenshots/planner.png"});
+  await nav("Inbox");assert.equal(await p.locator("#screen .time-board").count(),0);
+  const inbox=p.locator("#screen form.task-quick input[name=title]");
+  await inbox.fill("Inbox smoke test");await inbox.press("Enter");
+  await nav("Planner");await p.locator("#range").selectOption("Day");
+  await p.locator(".planner-queue [data-task]").filter({hasText:"Inbox smoke test"}).first().dragTo(p.locator(".slot[data-hour='10']").first());
+  const stored=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.title==="Inbox smoke test"));
+  assert.equal(stored.time,"10:00");assert.equal(stored.planning.kind,"exact-time");
+  await nav("Upcoming");assert.equal(await p.locator(".up-column").count(),6);
+  assert.equal(await p.locator("#screen .time-board").count(),0);
+  const month=p.locator('.up-column').filter({has:p.getByRole("heading",{name:"Next Month"})});
+  await month.locator("input[name=title]").fill("Month smoke test");
+  await month.locator("input[name=title]").press("Enter");
+  const planned=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.title==="Month smoke test"));
+  assert.equal(planned.planning.kind,"month");assert.equal(planned.date,"");assert.equal(planned.time,"");
+  await p.screenshot({path:"workspace-screenshots/upcoming-overview.png"});
+  for(const [mode,count] of [["Day",7],["Week",5],["Month",5]]) {
+    await p.getByRole("button",{name:mode,exact:true}).click();
+    assert.equal(await p.locator(".up-column").count(),count);
+    assert.equal(await p.locator("#screen .time-board").count(),0);
+  }
+  await p.screenshot({path:"workspace-screenshots/upcoming-month.png"});
+  await nav("Projects");
+  await p.getByRole("button",{name:"New project",exact:true}).first().click();
+  await p.getByLabel("Project name").fill("Workspace smoke project");
+  await p.getByLabel("Linked skill").fill("Testing");
+  await p.getByRole("button",{name:"Save",exact:true}).click();
+  await p.locator("#screen .task-workspace").waitFor();
+  assert.equal(await p.locator("#screen .time-board").count(),0);
+  const quick=p.locator("#screen form.task-quick input[name=title]");
+  await quick.fill("Project smoke task");await quick.press("Enter");
+  const project=await p.evaluate(()=>{const s=JSON.parse(localStorage.getItem("lifeos"));return {project:s.projects.find(p=>p.name==="Workspace smoke project"),task:s.tasks.find(t=>t.title==="Project smoke task")};});
+  assert.equal(project.task.project,project.project.id);
+  await p.locator("#screen .row[data-task]").filter({hasText:"Project smoke task"}).locator("select.mini-plan").selectOption("nextMonth");
+  const moved=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.title==="Project smoke task"));
+  assert.equal(moved.project,project.project.id);assert.equal(moved.planning.kind,"month");
+  await p.screenshot({path:"workspace-screenshots/project.png"});
+  if(errors.length)throw Error("Browser errors: "+errors.join("; "));
+  console.log("PASS browser Planner, Inbox, Upcoming, Projects and persistence");
+} finally {await browser?.close();server.kill("SIGTERM");}
