@@ -59,7 +59,7 @@ try {
 
   await page.getByRole("tab", { name: "Upcoming" }).click();
   await page.getByText("UPCOMING TASK BUCKETS").waitFor();
-  await page.getByLabel("Days").selectOption("5");
+  await page.getByLabel("Days", { exact: true }).selectOption("5");
   assert.equal(await page.locator(".lo-lane").count(), 5);
 
   await page.getByRole("button", { name: "Start", exact: true }).click();
