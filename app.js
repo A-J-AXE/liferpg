@@ -1,4 +1,5 @@
 import { searchTasks, renderSidebar } from "/shell.js";
+import { addDays, addMonths, planOf, applyPlan, upcomingHTML } from "./ui/planning.mjs";
 const $ = (s) => document.querySelector(s);
 const safe = (v) =>
   String(v ?? "").replace(
@@ -35,9 +36,11 @@ const gymURL = window.lifeosHosted
   ? location.origin + "/gym/"
   : "http://127.0.0.1:5173/";
 let view =
-    location.pathname === "/design-system" ? "Design system" : "Overview",
+    location.pathname === "/design-system" ? "Design system" : "Planner",
   date = now,
-  range = "Day";
+  range = "Day",
+  upcomingMode = "Overview",
+  upcomingAnchor = now;
 const project = (k) => state.projects.find((p) => p.id === k);
 const image = (p) =>
   p?.image ? '<img class="thumb" alt="" src="' + safe(p.image) + '">' : "";
@@ -235,6 +238,7 @@ function taskForm(t) {
         priorities.map((x) => [x, x]),
         t?.priority || "None",
       ) +
+      '<details class="task-advanced"><summary>More options</summary>' +
       area("notes", "Description", t?.notes) +
       field("tags", "Tags", "text", t?.tags) +
       field("location", "Location", "text", t?.location) +
@@ -243,7 +247,7 @@ function taskForm(t) {
         "children",
         "Subtasks (one per line)",
         t?.children.map((s) => s.title).join("\n"),
-      ),
+      ) + "</details>",
     async (f) => {
       let file = f.removeFile ? null : t?.file;
       if (f.attachment?.size) {
@@ -267,6 +271,9 @@ function taskForm(t) {
           })),
       };
       if (next.time && !next.date) throw Error("Choose a date for this time");
+      if (next.date) applyPlan(next, next.time ? "exact-time" : "day", next.date, next.time);
+      else if (t && !t.date && ["month","week","someday"].includes(planOf(t).kind)) next.planning = {...planOf(t)};
+      else applyPlan(next,"unscheduled");
       if (t) {
         if (f.scope === "series") editFollowing(t, next);
         Object.assign(t, next);
@@ -337,7 +344,10 @@ function row(t) {
           "</span></label>",
       )
       .join("") +
-    "</div></div>"
+    '</div><select class="mini-plan" aria-label="Plan ' + safe(t.title) + '" data-quick-plan="' + safe(t.id) + '">' +
+    '<option value="" selected>⋯</option><option value="today">Today</option><option value="tomorrow">Tomorrow</option>' +
+    '<option value="nextWeek">Next week</option><option value="nextMonth">Next month</option>' +
+    '<option value="someday">Someday</option><option value="inbox">Inbox</option></select></div>'
   );
 }
 function agenda() {
@@ -352,12 +362,12 @@ function agenda() {
           : view === "Tasks"
             ? true
             : view === "Inbox"
-              ? !t.date
+              ? planOf(t).kind === "unscheduled"
               : t.date === date,
     );
   return (
     '<div class="card"><div class="bar"><h2>' +
-    safe(p?.name || "Agenda") +
+    safe(p?.name || (view === "Inbox" ? "Inbox" : view === "Tasks" ? "Tasks" : "Agenda")) +
     "</h2>" +
     button("＋ Add task", "add") +
     "</div>" +
@@ -369,6 +379,9 @@ function agenda() {
         " " +
         button("Edit project", "project", p.id)
       : "") +
+    (p || view === "Inbox" || view === "Tasks" ?
+      '<form class="up-quick task-quick" data-quick-kind="unscheduled" data-quick-project="' + safe(p?.id || "") +
+      '"><label class="sr-only" for="task-quick-title">Task title</label><span aria-hidden="true">＋</span><input id="task-quick-title" name="title" placeholder="Add task…" maxlength="300" autocomplete="off" required></form>' : "") +
     [false, true]
       .map((done) => {
         let group = tasks.filter((t) => t.done === done);
@@ -439,37 +452,15 @@ function calendar() {
     ":" +
     String(n % 60).padStart(2, "0");
   function block(t, pos = "") {
-    const p = project(t.project),
-      color = /^#[0-9a-f]{6}$/i.test(p?.color) ? p.color : "var(--accent)";
-    const name =
-      t.time +
-      " · " +
-      t.title +
-      " · " +
-      t.minutes +
-      " min" +
-      (p ? " · " + p.name : "");
-    return button(
-      '<span class="block-title">' +
-        image(p) +
-        safe(t.title) +
-        '</span><span class="block-time">' +
-        t.time +
-        " · " +
-        Number(t.minutes) +
-        "m</span>",
-      "edit",
-      t.id,
-      'class="time-block" aria-label="' +
-        safe(name) +
-        '" title="' +
-        safe(name) +
-        '" style="--project:' +
-        color +
-        ";" +
-        pos +
-        '"',
-    );
+    const p=project(t.project),
+      color=/^#[0-9a-f]{6}$/i.test(p?.color)?p.color:"var(--accent)";
+    const name=t.time+" · "+t.title+" · "+t.minutes+" min"+(p?" · "+p.name:"");
+    const content='<span class="block-title">'+image(p)+safe(t.title)+'</span>'+
+      '<span class="block-time">'+safe(t.time)+' · '+Number(t.minutes)+'m</span>';
+    return '<div class="time-block" draggable="true" data-task="'+safe(t.id)+'" style="--project:'+color+';'+pos+'">'+
+      button(content,"edit",t.id,'class="time-block-main" aria-label="'+safe(name)+'" title="'+safe(name)+'"')+
+      (pos?'<span class="resize-grip" data-resize="'+safe(t.id)+'" role="slider" tabindex="0" aria-label="Resize '+safe(t.title)+'" aria-valuemin="15" aria-valuemax="1440" aria-valuenow="'+Number(t.minutes)+'"></span>':"")+
+      '</div>';
   }
   // Give simultaneous events their own lanes until the overlap group clears.
   function timed(tasks) {
@@ -564,7 +555,7 @@ function calendar() {
     button("Today", "reset") +
     button("›", "next") +
     '<select aria-label="Calendar range" id="range">' +
-    ["Day", "2 days", "3 days", "4 days", "5 days", "6 days", "Week", "Month"]
+    ["Day", "2 days", "3 days", "4 days", "5 days", "6 days", "7 days", "Week", "Month"]
       .map(
         (v) =>
           "<option " + (range === v ? "selected" : "") + ">" + v + "</option>",
@@ -673,12 +664,44 @@ function habits() {
       .join("")
   );
 }
+function taskWorkspace() {
+  const p=project(view);
+  const tasks=state.tasks.filter(t => !t.trashed && (
+    p ? t.project===p.id :
+    view==="Inbox" ? planOf(t).kind==="unscheduled" : true
+  ));
+  const open=tasks.filter(t=>!t.done),done=tasks.filter(t=>t.done);
+  const completion=tasks.length?Math.round(100*done.length/tasks.length):0;
+  const metadata=p
+    ? '<div class="project-head"><div class="project-identity">'+image(p)+
+      '<span>'+safe(p.stage||"In progress")+' · '+safe(p.skill||"")+'</span></div>'+
+      '<div class="project-progress" role="progressbar" aria-label="Project completion" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+completion+'"><span style="width:'+completion+'%"></span></div>'+
+      button("Edit project","project",p.id)+'</div>'
+    : "";
+  const quick='<form class="up-quick task-quick" data-quick-kind="unscheduled" data-quick-project="'+safe(p?.id||"")+'">'+
+    '<label class="sr-only" for="workspace-task-title">New task title</label><span aria-hidden="true">＋</span>'+
+    '<input id="workspace-task-title" name="title" placeholder="Add task…" autocomplete="off" required maxlength="300"></form>';
+  const duration=(items)=>items.reduce((sum,t)=>sum+Number(t.minutes||0),0);
+  const heading=(label,items)=>'<div class="task-section-heading"><span>'+label+'</span><small>'+items.length+' · '+duration(items)+' min</small></div>';
+  return '<section class="lifeos-task-page'+(p?' project':'')+'">'+metadata+
+    '<div class="task-list-toolbar"><span>'+tasks.length+' task'+(tasks.length===1?'':'s')+'</span>'+ (view==="Tasks"?button("New project","project"):"")+'</div>'+
+    quick+heading("To-dos",open)+
+    (open.length?open.map(row).join(""):'<p class="task-empty">No open tasks</p>')+
+    (done.length?'<details class="done-group"><summary>Completed · '+done.length+'</summary>'+heading("Done",done)+done.map(row).join("")+'</details>':"")+
+    '</section>';
+}
+function plannerQueue() {
+  const pending = state.tasks.filter(t => !t.trashed && !t.done && !t.time && planOf(t).kind !== "someday");
+  return '<section class="planner-queue" aria-label="Tasks to schedule"><div class="planner-queue-head"><h2>To schedule</h2><span>'+pending.length+'</span></div>' +
+    '<form class="up-quick task-quick" data-quick-kind="unscheduled"><label class="sr-only" for="planner-task-title">New task title</label><span aria-hidden="true">＋</span><input id="planner-task-title" name="title" placeholder="Add task…" autocomplete="off" required maxlength="300"></form>' +
+    '<div class="planner-queue-items">'+pending.map(row).join("")+'</div></section>';
+}
 function render() {
   document.documentElement.classList.toggle("black", state.theme === "Black");
   renderSidebar({
     view,
     projects: state.projects,
-    count: state.tasks.filter((t) => !t.date && !t.done && !t.trashed).length,
+    count: state.tasks.filter((t) => planOf(t).kind === "unscheduled" && !t.done && !t.trashed).length,
     theme: state.theme,
     onTheme: toggleTheme,
     onProject: () => projectForm(),
@@ -754,18 +777,14 @@ function render() {
   else
     body =
       view === "Overview"
-        ? '<div class="grid desk"><div class="agenda-stack">' +
-          agenda() +
-          summary() +
-          "</div>" +
-          calendar() +
-          '</div><section class="review-grid"><div>' +
-          fitnessSummary() +
-          '</div><div class="card"><h2>Habits</h2>' +
-          habits() +
-          "</div></section>" +
-          contentHub()
-        : '<div class="grid">' + agenda() + calendar() + "</div>";
+        ? '<div class="lifeos-overview"><div class="agenda-stack">' + agenda() + summary() +
+          '</div><section class="review-grid"><div>' + fitnessSummary() +
+          '</div><div class="card"><h2>Habits</h2>' + habits() + '</div></section>' + contentHub() + '</div>'
+        : view === "Upcoming"
+          ? upcomingHTML({tasks:state.tasks,mode:upcomingMode,anchor:upcomingAnchor,today:day(),renderTask:row})
+          : view === "Planner" || view === "Today" || view === "Agenda"
+            ? '<div class="planner-layout">' + plannerQueue() + calendar() + '</div>'
+            : '<div class="task-workspace">' + taskWorkspace() + '</div>';
   if (view === "Design system" && $("#screen lifeos-showcase")) {
     tick();
     return;
@@ -799,6 +818,17 @@ document.addEventListener("click", (e) => {
       }
       render();
       break;
+    case "upMode":
+      upcomingMode = k; upcomingAnchor = day(); render(); break;
+    case "upToday":
+      upcomingAnchor = day(); render(); break;
+    case "upPrev":
+    case "upNext": {
+      const step = b.dataset.act === "upNext" ? 1 : -1;
+      upcomingAnchor = upcomingMode === "Month" ? addMonths(upcomingAnchor,step)
+        : addDays(upcomingAnchor,step*(upcomingMode === "Week" ? 7 : 1));
+      render(); break;
+    }
     case "close":
       $("#modal").close();
       break;
@@ -819,7 +849,7 @@ document.addEventListener("click", (e) => {
       save();
       break;
     case "reset":
-      view = "Today";
+      view = "Planner";
       date = now;
       range = "Day";
       render();
@@ -890,15 +920,93 @@ document.addEventListener("change", (e) => {
     range = e.target.value;
     render();
   }
+  if (e.target.matches("[data-quick-plan]")) {
+    const task = state.tasks.find(t => t.id === e.target.dataset.quickPlan);
+    if (!task) return;
+    const today = day();
+    const tomorrow = addDays(today,1);
+    const nextWeek = addDays(today,7);
+    const nextMonth = addMonths(today,1);
+    const choice = e.target.value;
+    if (choice === "today") applyPlan(task,"day",today);
+    if (choice === "tomorrow") applyPlan(task,"day",tomorrow);
+    if (choice === "nextWeek") applyPlan(task,"week",nextWeek);
+    if (choice === "nextMonth") applyPlan(task,"month",nextMonth);
+    if (choice === "someday") applyPlan(task,"someday");
+    if (choice === "inbox") applyPlan(task,"unscheduled");
+    if (choice) save();
+  }
+});
+document.addEventListener("submit", e => {
+  const f = e.target.closest("form.up-quick");
+  if(!f) return;
+  e.preventDefault();
+  const title = f.elements.namedItem("title")?.value.trim();
+  if(!title) return;
+  const task = {id:id(),title,project:f.dataset.quickProject||"",date:"",time:"",priority:"None",notes:"",
+    minutes:String(state.config?.task||30),children:[],repeat:"None",done:false};
+  applyPlan(task,f.dataset.quickKind||"unscheduled",f.dataset.quickValue||"");
+  state.tasks.push(task);save();
+});
+// Resize calendar blocks in 15-minute steps. Keyboard arrows are equivalent.
+let resizing=null;
+const minutesAfterResize=(start,dy,scale)=>Math.max(15,Math.min(1440-start.at,
+  Math.round((start.minutes+dy/scale*60)/15)*15));
+document.addEventListener("pointerdown",e=>{
+  const handle=e.target.closest("[data-resize]");
+  if(!handle)return;
+  const t=state.tasks.find(t=>t.id===handle.dataset.resize);
+  if(!t)return;
+  const board=handle.closest(".time-board");
+  const hour=parseFloat(getComputedStyle(board).getPropertyValue("--hour"))||48;
+  const at=Number(t.time.slice(0,2))*60+Number(t.time.slice(3,5));
+  resizing={id:t.id,at,minutes:Number(t.minutes)||30,y:e.clientY,pointer:e.pointerId,
+    scale:hour,block:handle.closest(".time-block")};
+  handle.setPointerCapture?.(e.pointerId);
+  e.preventDefault();
+  e.stopPropagation();
+});
+document.addEventListener("pointermove",e=>{
+  if(!resizing||e.pointerId!==resizing.pointer)return;
+  const mins=minutesAfterResize(resizing,e.clientY-resizing.y,resizing.scale);
+  resizing.block.style.height="calc("+mins/60+" * var(--hour))";
+  e.preventDefault();
+});
+document.addEventListener("pointerup",e=>{
+  if(!resizing||e.pointerId!==resizing.pointer)return;
+  const task=state.tasks.find(t=>t.id===resizing.id);
+  if(task){task.minutes=String(minutesAfterResize(resizing,e.clientY-resizing.y,resizing.scale));save();}
+  resizing=null;
+});
+document.addEventListener("pointercancel",()=>{
+  if(resizing){resizing=null;render();}
+});
+document.addEventListener("keydown",e=>{
+  const grip=e.target.closest("[data-resize]");
+  if(!grip||!["ArrowUp","ArrowDown"].includes(e.key))return;
+  const t=state.tasks.find(t=>t.id===grip.dataset.resize);
+  if(!t)return;
+  e.preventDefault();
+  const at=Number(t.time.slice(0,2))*60+Number(t.time.slice(3,5));
+  t.minutes=String(Math.max(15,Math.min(1440-at,Number(t.minutes)+(e.key==="ArrowDown"?15:-15))));
+  save();
 });
 document.addEventListener("dragstart", (e) => {
+  if (e.target.closest("[data-resize]")) {e.preventDefault();return;}
   let r = e.target.closest("[data-task]");
   if (r) e.dataTransfer.setData("text/plain", r.dataset.task);
 });
 document.addEventListener("dragover", (e) => {
-  if (e.target.closest(".slot")) e.preventDefault();
+  if (e.target.closest(".slot, .up-column")) e.preventDefault();
 });
 document.addEventListener("drop", (e) => {
+  const col = e.target.closest(".up-column");
+  if (col) {
+    e.preventDefault();
+    const moving = state.tasks.find(t=>t.id === e.dataTransfer.getData("text/plain"));
+    if (moving) {applyPlan(moving,col.dataset.planKind,col.dataset.planValue);save();}
+    return;
+  }
   let slot = e.target.closest(".slot");
   if (!slot) return;
   e.preventDefault();
@@ -910,6 +1018,7 @@ document.addEventListener("drop", (e) => {
     t.time = slot.dataset.hour
       ? slot.dataset.hour.padStart(2, "0") + ":00"
       : t.time || "09:00";
+    applyPlan(t, "exact-time", t.date, t.time);
     save();
   }
 });
@@ -929,7 +1038,28 @@ function tick() {
     Math.floor(left / 60) +
     ":" +
     String(left % 60).padStart(2, "0");
+  const control = $("#timer-toggle");
+  if (control) {
+    const running = !!t.end && left > 0;
+    control.textContent = running ? "Ⅱ" : "▶";
+    control.setAttribute("aria-label", running ? "Pause focus timer" : "Start focus timer");
+    control.title = running ? "Pause timer" : "Start or resume timer";
+  }
 }
+$("#timer-toggle").onclick = () => {
+  const timer=state.timer;
+  const remaining=timer.end ? Math.max(0,Math.ceil((timer.end-Date.now())/1000)) : Number(timer.left);
+  if (timer.end) {
+    timer.left=remaining;
+    timer.end=null;
+  } else {
+    const duration=Number(state.config?.durations?.[timer.mode])*60 ||
+      {Focus:1500,Break:300,"Long break":900}[timer.mode] || 1500;
+    timer.left=remaining>0?remaining:duration;
+    timer.end=Date.now()+timer.left*1000;
+  }
+  save();
+};
 $("#timer").onclick = () => {
   let t = state.timer;
   dialog(
@@ -1147,6 +1277,7 @@ function repeatAfter(t) {
     previous: t.id,
     series: t.series || t.id,
     date: next,
+    planning: {kind: t.time ? "exact-time" : "day", value: next},
     done: false,
     children: t.children.map((s) => ({ ...s, done: false })),
   });
@@ -1637,7 +1768,6 @@ function watchRituals() {
 setInterval(watchRituals, 15000);
 
 const listFilters = [
-  "Upcoming",
   "Tomorrow",
   "Next 7 Days",
   "This Week",
@@ -1653,7 +1783,7 @@ function inList(t) {
   if (t.trashed) return false;
   if (view === "Tomorrow") return t.date === day(tomorrow);
   if (view === "Upcoming") return t.date > now;
-  if (view === "Someday") return !t.date && !t.done;
+  if (view === "Someday") return planOf(t).kind === "someday" && !t.done;
   if (view === "Done") return t.done;
   if (view === "This Month") return t.date?.slice(0, 7) === now.slice(0, 7);
   if (view === "This Week" || view === "Next 7 Days") {

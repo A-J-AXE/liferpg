@@ -1281,3 +1281,116 @@ task-date-picker {
   color: var(--muted);
   letter-spacing: 0;
 }
+
+
+/* Task-first workspaces: only Planner mounts the hourly calendar. */
+.sr-only { position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
+#screen:has(.upcoming-workspace),#screen:has(.planner-layout) { min-width:0; }
+#screen:has(.upcoming-workspace) .hero h1,#screen:has(.planner-layout) .hero h1 { font:600 23px/1.3 "Segoe UI",system-ui,sans-serif;margin:12px 0 16px;letter-spacing:-.035em; }
+.upcoming-workspace,.planner-layout,.task-workspace { min-width:0; }
+.up-toolbar { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 0 12px;border-bottom:1px solid var(--line); }
+.up-tabs,.up-navigation { display:flex;align-items:center;gap:3px; }
+.up-tabs button,.up-navigation button { border:1px solid transparent;background:transparent;padding:6px 11px;border-radius:6px;font-size:12px;min-height:32px; }
+.up-tabs button.selected { color:var(--ink);background:var(--tint);border-color:var(--line);font-weight:600; }
+.up-tabs button:not(.selected) { color:var(--muted); }
+.up-tabs button:focus-visible,.up-navigation button:focus-visible,.up-quick input:focus-visible { outline:2px solid var(--accent);outline-offset:2px; }
+.up-scroller { overflow-x:auto;overflow-y:visible;scrollbar-width:thin;max-width:100%; }
+.up-board { display:grid;grid-auto-flow:column;grid-auto-columns:minmax(246px,270px);align-items:stretch;min-height:60vh; }
+.up-column { min-width:0;border-right:1px solid var(--line);padding:14px 12px 28px;transition:background .12s; }
+.up-column:first-child { border-left:1px solid var(--line); }
+.up-column:has(.up-quick:focus-within) { background:color-mix(in srgb,var(--tint) 20%,transparent); }
+.up-column-head { padding:0 0 12px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:flex-start;justify-content:space-between; }
+.up-column-head h2 { font:600 13px/1.4 "Segoe UI",system-ui,sans-serif;margin:0 0 2px;letter-spacing:0; }
+.up-column-head small { letter-spacing:0;color:var(--muted);font-size:11px; }
+.up-count { font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums; }
+.up-quick { position:relative;display:flex;align-items:center;gap:5px;margin:10px 0 8px;min-width:0; }
+.up-quick > span { color:var(--muted);font-size:18px;line-height:1; }
+.up-quick input { border:none;background:transparent;border-radius:4px;min-width:0;flex:1;font-size:12px;padding:5px 6px;box-shadow:none; }
+.up-quick input::placeholder { color:var(--muted);opacity:.82; }
+.up-task-list .row[data-task],.planner-queue .row[data-task],.task-workspace .row[data-task] { border-bottom:1px solid color-mix(in srgb,var(--line) 75%,transparent);padding:7px 3px;align-items:flex-start;gap:8px;min-width:0; }
+.up-task-list .row[data-task] .grow > button,.planner-queue .row[data-task] .grow > button,.task-workspace .row[data-task] .grow > button { text-overflow:ellipsis;white-space:normal;overflow-wrap:anywhere;text-align:left;font-size:12px;padding:0; }
+.up-task-list .row[data-task] .pill,.planner-queue .row[data-task] .pill { font-size:10px;letter-spacing:0;gap:3px; }
+.up-task-list .row[data-task] input[type="checkbox"],.planner-queue .row[data-task] input[type="checkbox"] { margin-top:3px; }
+.up-done-label { text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-size:10px;margin:14px 0 5px; }
+.planner-layout { display:grid;grid-template-columns:minmax(215px,285px) minmax(0,1fr);gap:14px;align-items:start; }
+.planner-queue { min-width:0;padding:10px 8px;background:var(--panel);border:1px solid var(--line);border-radius:8px; }
+.planner-queue-head { display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 3px 8px;border-bottom:1px solid var(--line); }
+.planner-queue-head h2 { font:600 13px "Segoe UI",system-ui,sans-serif;letter-spacing:0;margin:0; }
+.planner-queue-head span { color:var(--muted);font-size:11px; }
+.planner-queue-items { max-height:65vh;overflow-y:auto;scrollbar-width:thin; }
+.planner-layout .calendar-card { margin:0;padding:10px;border-radius:8px; }
+.planner-layout .calendar-head { gap:6px;margin-bottom:10px;flex-wrap:wrap; }
+.planner-layout .calendar-head h2 { font:600 13px "Segoe UI",system-ui,sans-serif; }
+.planner-layout .time-board { grid-template-columns:43px repeat(var(--days),minmax(128px,1fr)); }
+.task-workspace { max-width:960px; }
+.task-workspace .card { margin:0;padding:14px;border-radius:8px; }
+.task-workspace .card h2 { font:600 16px "Segoe UI",system-ui,sans-serif;margin:0; }
+.lifeos-overview .agenda-stack { min-width:0; }
+@media (max-width:1000px) { .planner-layout { grid-template-columns:minmax(185px,230px) minmax(0,1fr);gap:8px; } }
+@media (max-width:760px) { .planner-layout { display:flex;flex-direction:column; } .planner-queue,.planner-layout .calendar-card { width:100%; } .planner-queue-items { max-height:220px; } .up-toolbar { flex-wrap:wrap; } .up-board { grid-auto-columns:minmax(235px,270px); } }
+
+/* Contextual native planning selector: visible on hover, focus and keyboard selection. */
+.row[data-task] .mini-plan {
+  flex:none;align-self:flex-start;max-width:29px;width:29px;min-height:25px;padding:2px 0 2px 3px;
+  border:1px solid transparent;background:transparent;color:var(--muted);
+  font-size:13px;opacity:.35;cursor:pointer;
+}
+.row[data-task]:hover .mini-plan,.row[data-task]:focus-within .mini-plan,
+.row[data-task] .mini-plan:focus-visible {opacity:1;border-color:var(--line);background:var(--panel);}
+.row[data-task] .mini-plan:focus-visible {outline:2px solid var(--accent);outline-offset:1px;}
+
+/* Compact application header and progressive task composer. */
+main > header { min-height:40px;padding:0 0 9px;gap:8px; }
+main > header .global-search { display:inline-flex;align-items:center;gap:10px;max-width:180px;font-size:12px;color:var(--muted);background:transparent;border:1px solid var(--line);padding:4px 9px; }
+.global-search kbd {margin-left:auto;font-size:10px;opacity:.7;font-family:inherit;}
+main > header #timer {margin-left:auto;}
+.task-editor { display:flex;flex-direction:column;gap:8px; }
+.task-editor > h2 { font:600 18px "Segoe UI",system-ui,sans-serif;margin-bottom:2px; }
+.task-editor > label { margin:0; }
+.task-editor > label input,.task-editor > label select {min-height:34px;}
+.task-advanced {border-top:1px solid var(--line);padding-top:8px;margin-top:6px;}
+.task-advanced summary {font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;outline-offset:3px;}
+.task-advanced[open] {display:flex;flex-direction:column;gap:8px;}
+.task-advanced label {margin:0;}
+
+
+/* Clean task-only Inbox / Project / Tasks workspace: no calendar or dashboard card. */
+#screen .hero h1 {font:600 clamp(22px,2.15vw,27px)/1.3 "Segoe UI",system-ui,sans-serif;letter-spacing:-.035em;margin:13px 0 17px;}
+.lifeos-task-page {max-width:900px;min-width:0;}
+.lifeos-task-page .project-head {display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-height:40px;padding:2px 0 13px;border-bottom:1px solid var(--line);}
+.lifeos-task-page .project-identity {display:flex;align-items:center;gap:8px;min-width:0;color:var(--muted);font-size:12px;}
+.lifeos-task-page .project-identity .thumb {width:28px;height:28px;border-radius:5px;}
+.lifeos-task-page .project-progress {flex:1;min-width:120px;height:5px;max-width:230px;border-radius:10px;background:var(--line);overflow:hidden;}
+.lifeos-task-page .project-progress > span {display:block;height:100%;background:var(--accent);border-radius:inherit;}
+.lifeos-task-page .project-head button {margin-left:auto;border:1px solid var(--line);background:transparent;padding:5px 9px;color:var(--muted);font-size:12px;}
+.lifeos-task-page .task-list-toolbar {display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px;min-height:20px;margin:10px 0 2px;}
+.lifeos-task-page .up-quick {padding:4px 6px;margin:8px 0 14px;border:1px solid var(--line);border-radius:7px;background:var(--panel);}
+.lifeos-task-page .up-quick input {font-size:13px;padding:7px 6px;}
+.lifeos-task-page .task-section-heading {display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 4px 7px;border-bottom:1px solid var(--line);font-size:12px;font-weight:600;}
+.lifeos-task-page .task-section-heading small {color:var(--muted);font-size:10px;letter-spacing:0;font-weight:400;}
+.lifeos-task-page .row[data-task] {padding:10px 4px;min-height:47px;}
+.lifeos-task-page .row[data-task] .grow > button {font-size:13px;line-height:1.4;}
+.lifeos-task-page.project .row .pill button {display:none;}
+.lifeos-task-page .task-empty {color:var(--muted);font-size:12px;padding:13px 5px;}
+.lifeos-task-page .done-group {border-top:1px solid var(--line);margin-top:18px;}
+.lifeos-task-page .done-group summary {cursor:pointer;color:var(--muted);font-size:12px;padding:11px 4px;}
+
+/* Draggable, keyboard-resizable scheduled blocks. */
+.time-block { position:relative;min-width:0;min-height:8px; }
+.time-block .time-block-main { display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 5px;
+  width:100%;height:100%;background:transparent;border:none;text-align:left;min-width:0;color:inherit;font-size:12px;overflow:hidden; }
+.time-block .time-block-main:hover { background:transparent;color:inherit; }
+.time-block .resize-grip { position:absolute;bottom:0;left:0;right:0;height:7px;cursor:ns-resize;z-index:1; }
+.time-block:hover .resize-grip,.time-block:focus-within .resize-grip { background:linear-gradient(to bottom,transparent 3px,var(--project) 3px,var(--project) 5px,transparent 5px); }
+.time-block .resize-grip:focus-visible {outline:2px solid var(--accent);outline-offset:1px;}
+.time-block .block-title {flex:1;min-width:0;}
+.time-block .block-time {flex:none;}
+
+/* One-click persistent Pomodoro: compact icon-led controls. */
+main > header .focus-pill {margin-left:auto;display:inline-flex;align-items:center;gap:0;
+  border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden;min-height:32px;}
+main > header .focus-pill button {margin:0;border:0;border-radius:0;background:transparent;min-height:30px;}
+main > header .focus-pill #timer-toggle {width:34px;min-width:34px;padding:3px 7px;border-right:1px solid var(--line);color:var(--accent);font-size:15px;}
+main > header .focus-pill #timer {font-size:12px;font-weight:600;padding:4px 10px;font-variant-numeric:tabular-nums;}
+main > header .focus-pill button:hover {background:var(--tint);}
+main > header .focus-pill button:focus-visible {outline:2px solid var(--accent);outline-offset:-2px;}
