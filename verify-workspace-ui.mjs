@@ -26,6 +26,11 @@ try {
   await p.locator(".planner-queue [data-task]").filter({hasText:"Inbox smoke test"}).first().dragTo(p.locator(".slot[data-hour='10']").first());
   const stored=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.title==="Inbox smoke test"));
   assert.equal(stored.time,"10:00");assert.equal(stored.planning.kind,"exact-time");
+  const resizeHandle=p.locator('.time-block[data-task="'+stored.id+'"] .resize-grip');
+  await resizeHandle.focus();
+  await resizeHandle.press("ArrowDown");
+  const resized=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.title==="Inbox smoke test"));
+  assert.equal(Number(resized.minutes),Number(stored.minutes)+15);
   await nav("Upcoming");assert.equal(await p.locator(".up-column").count(),6);
   assert.equal(await p.locator("#screen .time-board").count(),0);
   const month=p.locator('.up-column').filter({has:p.getByRole("heading",{name:"Next Month"})});

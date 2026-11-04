@@ -452,37 +452,15 @@ function calendar() {
     ":" +
     String(n % 60).padStart(2, "0");
   function block(t, pos = "") {
-    const p = project(t.project),
-      color = /^#[0-9a-f]{6}$/i.test(p?.color) ? p.color : "var(--accent)";
-    const name =
-      t.time +
-      " · " +
-      t.title +
-      " · " +
-      t.minutes +
-      " min" +
-      (p ? " · " + p.name : "");
-    return button(
-      '<span class="block-title">' +
-        image(p) +
-        safe(t.title) +
-        '</span><span class="block-time">' +
-        t.time +
-        " · " +
-        Number(t.minutes) +
-        "m</span>",
-      "edit",
-      t.id,
-      'class="time-block" aria-label="' +
-        safe(name) +
-        '" title="' +
-        safe(name) +
-        '" style="--project:' +
-        color +
-        ";" +
-        pos +
-        '"',
-    );
+    const p=project(t.project),
+      color=/^#[0-9a-f]{6}$/i.test(p?.color)?p.color:"var(--accent)";
+    const name=t.time+" · "+t.title+" · "+t.minutes+" min"+(p?" · "+p.name:"");
+    const content='<span class="block-title">'+image(p)+safe(t.title)+'</span>'+
+      '<span class="block-time">'+safe(t.time)+' · '+Number(t.minutes)+'m</span>';
+    return '<div class="time-block" draggable="true" data-task="'+safe(t.id)+'" style="--project:'+color+';'+pos+'">'+
+      button(content,"edit",t.id,'class="time-block-main" aria-label="'+safe(name)+'" title="'+safe(name)+'"')+
+      (pos?'<span class="resize-grip" data-resize="'+safe(t.id)+'" role="slider" tabindex="0" aria-label="Resize '+safe(t.title)+'" aria-valuemin="15" aria-valuemax="1440" aria-valuenow="'+Number(t.minutes)+'"></span>':"")+
+      '</div>';
   }
   // Give simultaneous events their own lanes until the overlap group clears.
   function timed(tasks) {
@@ -970,7 +948,51 @@ document.addEventListener("submit", e => {
   applyPlan(task,f.dataset.quickKind||"unscheduled",f.dataset.quickValue||"");
   state.tasks.push(task);save();
 });
+// Resize calendar blocks in 15-minute steps. Keyboard arrows are equivalent.
+let resizing=null;
+const minutesAfterResize=(start,dy,scale)=>Math.max(15,Math.min(1440-start.at,
+  Math.round((start.minutes+dy/scale*60)/15)*15));
+document.addEventListener("pointerdown",e=>{
+  const handle=e.target.closest("[data-resize]");
+  if(!handle)return;
+  const t=state.tasks.find(t=>t.id===handle.dataset.resize);
+  if(!t)return;
+  const board=handle.closest(".time-board");
+  const hour=parseFloat(getComputedStyle(board).getPropertyValue("--hour"))||48;
+  const at=Number(t.time.slice(0,2))*60+Number(t.time.slice(3,5));
+  resizing={id:t.id,at,minutes:Number(t.minutes)||30,y:e.clientY,pointer:e.pointerId,
+    scale:hour,block:handle.closest(".time-block")};
+  handle.setPointerCapture?.(e.pointerId);
+  e.preventDefault();
+  e.stopPropagation();
+});
+document.addEventListener("pointermove",e=>{
+  if(!resizing||e.pointerId!==resizing.pointer)return;
+  const mins=minutesAfterResize(resizing,e.clientY-resizing.y,resizing.scale);
+  resizing.block.style.height="calc("+mins/60+" * var(--hour))";
+  e.preventDefault();
+});
+document.addEventListener("pointerup",e=>{
+  if(!resizing||e.pointerId!==resizing.pointer)return;
+  const task=state.tasks.find(t=>t.id===resizing.id);
+  if(task){task.minutes=String(minutesAfterResize(resizing,e.clientY-resizing.y,resizing.scale));save();}
+  resizing=null;
+});
+document.addEventListener("pointercancel",()=>{
+  if(resizing){resizing=null;render();}
+});
+document.addEventListener("keydown",e=>{
+  const grip=e.target.closest("[data-resize]");
+  if(!grip||!["ArrowUp","ArrowDown"].includes(e.key))return;
+  const t=state.tasks.find(t=>t.id===grip.dataset.resize);
+  if(!t)return;
+  e.preventDefault();
+  const at=Number(t.time.slice(0,2))*60+Number(t.time.slice(3,5));
+  t.minutes=String(Math.max(15,Math.min(1440-at,Number(t.minutes)+(e.key==="ArrowDown"?15:-15))));
+  save();
+});
 document.addEventListener("dragstart", (e) => {
+  if (e.target.closest("[data-resize]")) {e.preventDefault();return;}
   let r = e.target.closest("[data-task]");
   if (r) e.dataTransfer.setData("text/plain", r.dataset.task);
 });
