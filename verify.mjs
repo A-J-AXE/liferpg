@@ -44,8 +44,16 @@ try {
   const errors = [];
   p.on("pageerror", (e) => errors.push(e.message));
   const click = (t) => p.getByRole("button", { name: t, exact: true }).click();
-  const nav = (t) =>
-    p.locator("#nav").getByRole("button", { name: t, exact: true }).click();
+  const nav = async (t) => {
+    const entry = p.locator("#nav").getByRole("button", { name: t, exact: true });
+    if (!(await entry.isVisible())) {
+      const more = p.locator("#nav details.more-views");
+      if (await more.count() && !(await more.getAttribute("open")).includes?.("open")) {
+        await more.locator("summary").click();
+      }
+    }
+    await entry.click();
+  };
   await p.goto("http://127.0.0.1:4310");
   await click("New project");
   await p.getByLabel("Project name").fill("Robotic arm");
