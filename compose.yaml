@@ -1,0 +1,48 @@
+name: liferpg
+services:
+  planner:
+    build: .
+    restart: unless-stopped
+    environment:
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set the HTTPS origin}
+      PLANNER_PASSWORD: ${PLANNER_PASSWORD:?Set a unique planner password}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    volumes: [planner:/app/.private]
+  api:
+    build: { context: ./fitness/api, target: default }
+    restart: unless-stopped
+    environment:
+      RP_ID: ${GYM_HOST:?Set the HTTPS hostname without a scheme}
+      ORIGIN: ${PUBLIC_ORIGIN}
+      DATA_DIR: /data
+      PORT: 3000
+    volumes: [gym:/data]
+  gymweb:
+    build: { context: ./fitness, dockerfile: web/Dockerfile }
+    restart: unless-stopped
+    environment:
+      BACKEND: api
+      PORT: 3000
+      NGINX_PORT: 8080
+      BASE_PATH: /gym
+      RESOLVER: 127.0.0.11
+      MEDIA_UPLOAD_MAX: 48m
+      CF_CONNECTING_IP: ""
+  gateway:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    depends_on: [planner, gymweb, api]
+    ports: ["127.0.0.1:8080:80"]
+    volumes: [./gateway.conf:/etc/nginx/conf.d/default.conf:ro]
+  gym-mcp:
+    profiles: [tools]
+    build: { context: ./fitness, dockerfile: Mcp.Dockerfile }
+    network_mode: none
+    read_only: true
+    environment: { OPENGYM_DATA: /data }
+    volumes: [gym:/data:ro]
+    stdin_open: true
+volumes:
+  planner:
+  gym:

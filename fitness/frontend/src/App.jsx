@@ -130,7 +130,8 @@ function Shell() {
   useEffect(() => {
     if (!ready || window.parent === window) return
     const sessions = (S.workouts || []).filter(w => w.id).map(w => ({id:String(w.id), name:w.name || 'Workout', date:w.d}))
-    window.parent.postMessage({type:'lifeos-sessions', sessions}, 'http://127.0.0.1:4310')
+    const origin = new URL(document.referrer || location.href).origin
+    if (origin === location.origin || origin === 'http://127.0.0.1:4310') window.parent.postMessage({type:'lifeos-sessions', sessions}, origin)
   }, [ready, S.workouts])
   // iOS: whether timer sounds get past the ring/silent switch (Settings → Sounds). Page-level,
   // so it is applied here on load and on change rather than at each beep.
@@ -516,3 +517,4 @@ export default function App() {
   }, [])
   return <HashRouter><Shell /></HashRouter>
 }
+

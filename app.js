@@ -1,72 +1,1980 @@
-const $=s=>document.querySelector(s);
-const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const id=()=>crypto.randomUUID();
-function day(d=new Date()){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
-const now=day();
-const defaults={projects:[],tasks:[],habits:[],receipts:{},diary:{},shop:[],profile:'Explorer',theme:'Light',skills:['Gym'],timer:{mode:'Focus',left:1500},spent:0};
-let state=JSON.parse(localStorage.getItem('lifeos')||'null')||defaults;
-let view='Overview',date=now,range='Day';
-const project=k=>state.projects.find(p=>p.id===k);
-const image=p=>p?.image?'<img class="thumb" alt="" src="'+safe(p.image)+'">':'';
-const earned=()=>Object.values(state.receipts);
-const total=(field,skill)=>earned().filter(r=>!skill||r.skill===skill).reduce((n,r)=>n+r[field],0);
-function save(){try{localStorage.setItem('lifeos',JSON.stringify(state))}catch{alert('Storage is full. The last edit could not be saved.');state=JSON.parse(localStorage.getItem('lifeos'))||defaults}render()}
-function button(t,a,k='',extra=''){return '<button data-act="'+a+'" data-key="'+safe(k)+'" '+extra+'>'+t+'</button>'}
-function field(n,label,type,value='',extra=''){return '<label>'+label+'<input name="'+n+'" type="'+type+'" value="'+safe(value)+'" '+extra+'></label>'}
-function area(n,label,value=''){return '<label>'+label+'<textarea name="'+n+'">'+safe(value)+'</textarea></label>'}
-function select(n,label,opts,value){return '<label>'+label+'<select name="'+n+'">'+opts.map(([v,t])=>'<option value="'+safe(v)+'" '+(v===value?'selected':'')+'>'+safe(t)+'</option>').join('')+'</select></label>'}
-function dialog(title,html,submit){$('#form').innerHTML='<h2>'+title+'</h2>'+html+'<div class="bar"><button type="button" data-act="close">Cancel</button><button>Save</button></div>';$('#form').onsubmit=async e=>{e.preventDefault();try{await submit(Object.fromEntries(new FormData(e.target)));$('#modal').close();save()}catch(err){alert(err.message)}};$('#modal').showModal()}
-async function picture(file){if(!file?.size)return '';const bm=await createImageBitmap(file);const c=document.createElement('canvas');c.width=c.height=180;const side=Math.min(bm.width,bm.height);c.getContext('2d').drawImage(bm,(bm.width-side)/2,(bm.height-side)/2,side,side,0,0,180,180);bm.close();return c.toDataURL('image/png')}
-function projectForm(p){dialog('Project studio',field('name','Project name','text',p?.name,'required')+field('skill','Linked skill','text',p?.skill,'required')+field('photo','Your project image','file','','accept="image/*"')+image(p),async f=>{const next={id:p?.id||id(),name:f.name.trim(),skill:f.skill.trim(),image:await picture(f.photo)||p?.image||''};if(!next.name||!next.skill)throw Error('Enter a project and skill name');if(p)Object.assign(p,next);else state.projects.push(next);if(!state.skills.includes(next.skill))state.skills.push(next.skill);view=next.id})}
-const priorities=['None','Low','Medium','High','Goal'];
-function taskForm(t){const p=t?.project??(project(view)?.id||'');dialog(t?'Edit task':'New task',field('title','Title','text',t?.title,'required')+image(project(p))+select('project','Project',[['','Personal'],...state.projects.map(p=>[p.id,p.name])],p)+field('date','Planned date','date',t?.date??(view==='Inbox'?'':date))+field('time','Start time','time',t?.time)+field('minutes','Duration (minutes)','number',t?.minutes||30,'min="1" required')+select('priority','Priority',priorities.map(x=>[x,x]),t?.priority||'None')+area('notes','Description',t?.notes)+field('tags','Tags','text',t?.tags)+field('location','Location','text',t?.location)+area('children','Subtasks (one per line)',t?.children.map(s=>s.title).join('\n')),f=>{const next={...f,id:t?.id||id(),done:t?.done||false,children:f.children.split('\n').map(x=>x.trim()).filter(Boolean).map(title=>({title,done:t?.children.find(x=>x.title===title)?.done||false}))};if(next.time&&!next.date)throw Error('Choose a date for this time');if(t)Object.assign(t,next);else state.tasks.push(next)})}
-function complete(t){t.done=!t.done;if(t.done)state.receipts[t.id]={title:t.title,skill:project(t.project)?.skill||'',xp:25,coins:4};else delete state.receipts[t.id];save()}
-function row(t){const p=project(t.project);return '<div class="row '+(t.priority==='Goal'?'goal':'')+'" draggable="true" data-task="'+t.id+'"><input aria-label="Complete '+safe(t.title)+'" type="checkbox" data-act="complete" data-key="'+t.id+'" '+(t.done?'checked':'')+'><div class="grow">'+button(safe(t.title),'edit',t.id)+'<div class="pill">'+image(p)+safe(p?.name||'Personal')+' · '+safe(t.priority)+' · '+t.minutes+'m</div>'+t.children.map((s,i)=>'<label><span><input type="checkbox" data-act="sub" data-key="'+t.id+'" data-i="'+i+'" '+(s.done?'checked':'')+'> '+safe(s.title)+'</span></label>').join('')+'</div></div>'}
-function agenda(){let p=project(view);let tasks=state.tasks.filter(t=>p?t.project===p.id:view==='Tasks'?true:view==='Inbox'?!t.date:t.date===date);return '<div class="card"><div class="bar"><h2>'+safe(p?.name||'Agenda')+'</h2>'+button('＋ Add task','add')+'</div>'+ (p?image(p)+safe(p.skill)+' '+button('Edit project','project',p.id):'')+ [false,true].map(done=>{let group=tasks.filter(t=>t.done===done);return '<h4>'+(done?'DONE':'TO-DOS')+' · '+group.length+' / '+group.reduce((n,t)=>n+Number(t.minutes),0)+' MIN</h4>'+group.map(row).join('')}).join('')+(!tasks.length?'<p>Capture a task and give it a place in your day.</p>':'')+'</div>'}
-function shift(n){let d=new Date(date+'T12:00');if(range==='Month'){d.setDate(1);d.setMonth(d.getMonth()+n)}else d.setDate(d.getDate()+n*(range==='Week'?7:1));date=day(d);render()}
-function calendar(){let d=new Date(date+'T12:00');let days=range==='Week'?7:1;if(range==='Month'){d.setDate(1);days=new Date(d.getFullYear(),d.getMonth()+1,0).getDate()}let rows='';for(let i=0;i<days;i++,d.setDate(d.getDate()+1)){let ds=day(d);let scheduled=state.tasks.filter(t=>t.date===ds&&t.time).sort((a,b)=>a.time.localeCompare(b.time));if(days>1){rows+='<div class="slot" data-date="'+ds+'"><small>'+ds.slice(5)+'</small>'+scheduled.map(t=>button(t.time+' '+safe(t.title),'edit',t.id)).join('')+'</div>';continue}let hours=[...new Set([8,9,10,11,12,13,14,15,16,17,18,...scheduled.map(t=>Number(t.time.slice(0,2)))])].sort((a,b)=>a-b);rows+=hours.map(h=>'<div class="slot" data-date="'+ds+'" data-hour="'+h+'"><small>'+String(h).padStart(2,'0')+':00</small>'+scheduled.filter(t=>Number(t.time.slice(0,2))===h).map(t=>button(image(project(t.project))+safe(t.title)+' · '+t.time,'edit',t.id)).join('')+'</div>').join('')}return '<div class="card"><h2>Calendar</h2><div class="bar">'+button('‹','prev')+button('Today','reset')+button('›','next')+'<select aria-label="Calendar range" id="range">'+['Day','Week','Month'].map(v=>'<option '+(v===range?'selected':'')+'>'+v+'</option>').join('')+'</select></div>'+googleAgenda()+rows+'</div>'}
-function skills(){return state.skills.map(s=>'<p>'+safe(s)+' · Lv '+(1+Math.floor(total('xp',s)/100))+'<progress max="100" value="'+total('xp',s)%100+'"></progress>'+total('xp',s)+' XP</p>').join('')}
-function summary(){return '<section class="summary"><div class="card"><h2>'+safe(state.profile)+'</h2>Level '+(1+Math.floor(total('xp')/100))+' · '+total('xp')+' XP · '+(total('coins')-state.spent)+' coins</div><div class="card"><h2>Skills</h2>'+skills()+'</div><div class="card"><h2>Daily check-in</h2>'+button(state.diary[now]?'Read today’s entry':'Write a reflection','nav','Diary')+'</div></section>'}
-function habits(){return button('＋ New habit','habit')+state.habits.map(h=>'<div class="card"><h2>'+safe(h.title)+'</h2>'+safe(h.skill)+' · 10 XP · 2 coins '+button(state.receipts[h.id+now]?'Undo check-in':'Check in','check',h.id)+'</div>').join('')}
-function render(){document.documentElement.classList.toggle('black',state.theme==='Black');$('#theme').textContent='◐  '+state.theme+' mode';let nav=['Overview','Inbox','Today','Tasks','openGym','Skills','Habits','Diary','Market','Settings'];$('#nav').innerHTML=nav.map(x=>button(x+(x==='Inbox'?' · '+state.tasks.filter(t=>!t.date&&!t.done).length:''),'nav',x,'class="'+(view===x?'active':'')+'"')).join('');$('#projects').innerHTML=state.projects.map(p=>button(image(p)+safe(p.name),'nav',p.id)).join('');let body='';if(view==='openGym')body='<iframe title="Native openGym" src="http://127.0.0.1:5173" style="width:100%;height:78vh;border:0"></iframe>';else if(view==='Diary')body=area('entry','Today’s reflection',state.diary[now])+button('Save entry','diary')+Object.entries(state.diary).reverse().map(([d,v])=>'<article class="card"><small>'+d+'</small><p>'+safe(v)+'</p></article>').join('');else if(view==='Skills')body=skills()+earned().map(r=>'<div class="row">'+safe(r.title)+' · '+safe(r.skill)+' +'+r.xp+' XP</div>').join('');else if(view==='Habits')body=habits();else if(view==='Settings')body=button('Edit profile','profile')+googleSettings();else if(view==='Market')body=button('Create reward','reward')+state.shop.map(r=>'<p>'+safe(r.title)+' '+button('Redeem · '+r.cost+' coins','redeem',r.id)+'</p>').join('');else body='<div class="grid">'+agenda()+calendar()+'</div>'+(view==='Overview'?summary()+fitnessSummary()+habits():'');$('#screen').innerHTML='<div class="hero"><small>'+new Date(date+'T12:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}).toUpperCase()+'</small><h1>'+safe(project(view)?.name||view)+'</h1></div>'+body;tick()}
-document.addEventListener('click',e=>{let b=e.target.closest('[data-act]');if(!b)return;let k=b.dataset.key,t=state.tasks.find(x=>x.id===k);switch(b.dataset.act){case 'nav':view=k;if(k==='Today'){date=now;range='Day'}render();break;case 'close':$('#modal').close();break;case 'project':projectForm(project(k));break;case 'edit':taskForm(t);break;case 'add':taskForm();break;case 'complete':complete(t);break;case 'sub':t.children[b.dataset.i].done=b.checked;save();break;case 'reset':view='Today';date=now;range='Day';render();break;case 'prev':shift(-1);break;case 'next':shift(1);break;case 'diary':state.diary[now]=$('[name=entry]').value;save();break;case 'profile':dialog('Profile',field('name','Display name','text',state.profile,'required'),f=>state.profile=f.name);break;case 'habit':dialog('Create habit',field('title','Habit','text','','required')+select('skill','Skill',state.skills.map(s=>[s,s])),f=>state.habits.push({...f,id:id()}));break;case 'check':{let h=state.habits.find(h=>h.id===k),key=k+now;if(state.receipts[key])delete state.receipts[key];else state.receipts[key]={title:h.title,skill:h.skill,xp:10,coins:2};save();break}case 'reward':dialog('Personal reward',field('title','Reward','text','','required')+field('cost','Coin price','number',10,'min="1" required'),f=>state.shop.push({...f,id:id()}));break;case 'redeem':{let r=state.shop.find(r=>r.id===k);if(total('coins')-state.spent>=r.cost){state.spent+=Number(r.cost);save()}else alert('Earn more coins to redeem this reward.');break}}});
-document.addEventListener('change',e=>{if(e.target.id==='range'){range=e.target.value;render()}});
-document.addEventListener('dragstart',e=>{let r=e.target.closest('[data-task]');if(r)e.dataTransfer.setData('text/plain',r.dataset.task)});
-document.addEventListener('dragover',e=>{if(e.target.closest('.slot'))e.preventDefault()});document.addEventListener('drop',e=>{let slot=e.target.closest('.slot');if(!slot)return;e.preventDefault();let t=state.tasks.find(t=>t.id===e.dataTransfer.getData('text/plain'));if(t){t.date=slot.dataset.date;t.time=slot.dataset.hour?slot.dataset.hour.padStart(2,'0')+':00':t.time||'09:00';save()}});
-$('#theme').onclick=()=>{state.theme=state.theme==='Light'?'Black':'Light';save()};$('#newProject').onclick=()=>projectForm();
-function tick(){let t=state.timer;let left=t.end?Math.max(0,Math.ceil((t.end-Date.now())/1000)):t.left;$('#timer').textContent=t.mode+' · '+Math.floor(left/60)+':'+String(left%60).padStart(2,'0')}
-$('#timer').onclick=()=>{let t=state.timer;dialog('Focus timer',select('mode','Mode',['Focus','Break','Long break'].map(s=>[s,s]),t.mode)+select('action','Timer',[[t.end?'pause':'start',t.end?'Pause':'Start / resume'],['reset','Reset']]),f=>{let seconds={Focus:1500,Break:300,'Long break':900}[f.mode];let left=f.mode===t.mode?(t.end?Math.max(0,Math.ceil((t.end-Date.now())/1000)):t.left):seconds;state.timer={mode:f.mode,left:f.action==='reset'?seconds:left,end:f.action==='start'?Date.now()+(left||seconds)*1000:null}})};
-document.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='c'&&!e.ctrlKey&&!e.metaKey&&!$('#modal').open&&!e.target.matches('input,textarea,select')){e.preventDefault();taskForm()}});
-render();setInterval(tick,1000);
-
-function fitnessSummary(){
-  const latest=Object.entries(state.receipts).filter(([k])=>k.startsWith('gym:')).map(([,v])=>v).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];
-  return '<div class="card"><h2>Training</h2><p>'+safe(latest?.title||'Open your workout plan')+'</p>'+button('Open training','nav','openGym')+'</div>';
+const $ = (s) => document.querySelector(s);
+const safe = (v) =>
+  String(v ?? "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
+const id = () => crypto.randomUUID();
+function day(d = new Date()) {
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
 }
-window.addEventListener('message',event=>{
-  if(event.origin!=='http://127.0.0.1:5173'||event.source!==document.querySelector('iframe')?.contentWindow||event.data?.type!=='lifeos-sessions'||!Array.isArray(event.data.sessions))return;
-  const receipts=Object.fromEntries(Object.entries(state.receipts).filter(([k])=>!k.startsWith('gym:')));
-  for(const w of event.data.sessions)if(typeof w.id==='string')receipts['gym:'+w.id]={title:w.name,date:w.date,skill:'Gym',xp:25,coins:4};
-  state.receipts=receipts;localStorage.setItem('lifeos',JSON.stringify(state));
+const now = day();
+const defaults = {
+  projects: [],
+  tasks: [],
+  habits: [],
+  receipts: {},
+  diary: {},
+  shop: [],
+  profile: "Explorer",
+  theme: "Light",
+  skills: ["Gym"],
+  timer: { mode: "Focus", left: 1500 },
+  spent: 0,
+};
+let state = JSON.parse(localStorage.getItem("lifeos") || "null") || defaults;
+const gymURL = window.lifeosHosted
+  ? location.origin + "/gym/"
+  : "http://127.0.0.1:5173/";
+let view = "Overview",
+  date = now,
+  range = "Day";
+const project = (k) => state.projects.find((p) => p.id === k);
+const image = (p) =>
+  p?.image ? '<img class="thumb" alt="" src="' + safe(p.image) + '">' : "";
+const earned = () => Object.values(state.receipts);
+const total = (field, skill) =>
+  earned()
+    .filter((r) => !skill || r.skill === skill)
+    .reduce((n, r) => n + r[field], 0);
+function save() {
+  try {
+    localStorage.setItem("lifeos", JSON.stringify(state));
+    syncBlocks();
+    if (window.lifeosHosted) queueCloud();
+    if (state.mcp && !window.lifeosHosted)
+      sharePlanner(true).catch(console.error);
+  } catch {
+    alert("Storage is full. The last edit could not be saved.");
+    state = JSON.parse(localStorage.getItem("lifeos")) || defaults;
+  }
+  render();
+}
+function button(t, a, k = "", extra = "") {
+  return (
+    '<button data-act="' +
+    a +
+    '" data-key="' +
+    safe(k) +
+    '" ' +
+    extra +
+    ">" +
+    t +
+    "</button>"
+  );
+}
+function field(n, label, type, value = "", extra = "") {
+  return (
+    "<label>" +
+    label +
+    '<input name="' +
+    n +
+    '" type="' +
+    type +
+    '" value="' +
+    safe(value) +
+    '" ' +
+    extra +
+    "></label>"
+  );
+}
+function area(n, label, value = "") {
+  return (
+    "<label>" +
+    label +
+    '<textarea name="' +
+    n +
+    '">' +
+    safe(value) +
+    "</textarea></label>"
+  );
+}
+function select(n, label, opts, value) {
+  return (
+    "<label>" +
+    label +
+    '<select aria-label="' +
+    safe(label) +
+    '" name="' +
+    n +
+    '">' +
+    opts
+      .map(
+        ([v, t]) =>
+          '<option value="' +
+          safe(v) +
+          '" ' +
+          (v === value ? "selected" : "") +
+          ">" +
+          safe(t) +
+          "</option>",
+      )
+      .join("") +
+    "</select></label>"
+  );
+}
+function dialog(title, html, submit) {
+  $("#form").innerHTML =
+    "<h2>" +
+    title +
+    "</h2>" +
+    html +
+    '<div class="bar"><button type="button" data-act="switchTheme">◐ Theme</button><button type="button" data-act="close">Cancel</button><button>Save</button></div>';
+  $("#form").onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await submit(Object.fromEntries(new FormData(e.target)));
+      $("#modal").close();
+      save();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+  $("#modal").showModal();
+}
+async function picture(file) {
+  if (!file?.size) return "";
+  const bm = await createImageBitmap(file);
+  const c = document.createElement("canvas");
+  c.width = c.height = 180;
+  const side = Math.min(bm.width, bm.height);
+  c.getContext("2d").drawImage(
+    bm,
+    (bm.width - side) / 2,
+    (bm.height - side) / 2,
+    side,
+    side,
+    0,
+    0,
+    180,
+    180,
+  );
+  bm.close();
+  return c.toDataURL("image/png");
+}
+function projectForm(p) {
+  dialog(
+    "Project studio",
+    field("name", "Project name", "text", p?.name, "required") +
+      field("folder", "Sidebar folder", "text", p?.folder) +
+      select(
+        "stage",
+        "Stage",
+        ["Inbox", "In progress", "Completed"].map((v) => [v, v]),
+        p?.stage || "In progress",
+      ) +
+      field("skill", "Linked skill", "text", p?.skill, "required") +
+      field("photo", "Your project image", "file", "", 'accept="image/*"') +
+      image(p),
+    async (f) => {
+      const next = {
+        id: p?.id || id(),
+        name: f.name.trim(),
+        folder: f.folder.trim(),
+        stage: f.stage,
+        skill: f.skill.trim(),
+        image: (await picture(f.photo)) || p?.image || "",
+      };
+      if (!next.name || !next.skill)
+        throw Error("Enter a project and skill name");
+      if (p) Object.assign(p, next);
+      else state.projects.push(next);
+      if (!state.skills.includes(next.skill)) state.skills.push(next.skill);
+      view = next.id;
+    },
+  );
+}
+const priorities = ["None", "Low", "Medium", "High", "Goal"];
+function taskForm(t) {
+  const p = t?.project ?? (project(view)?.id || "");
+  dialog(
+    t ? "Edit task" : "New task",
+    field("title", "Title", "text", t?.title, "required") +
+      image(project(p)) +
+      select(
+        "project",
+        "Project",
+        [["", "Personal"], ...state.projects.map((p) => [p.id, p.name])],
+        p,
+      ) +
+      field(
+        "date",
+        "Planned date",
+        "date",
+        t?.date ?? (view === "Inbox" ? "" : date),
+      ) +
+      field("time", "Start time", "time", t?.time) +
+      field(
+        "minutes",
+        "Duration (minutes)",
+        "number",
+        t?.minutes || state.config?.task || 30,
+        'min="1" required',
+      ) +
+      select(
+        "priority",
+        "Priority",
+        priorities.map((x) => [x, x]),
+        t?.priority || "None",
+      ) +
+      area("notes", "Description", t?.notes) +
+      field("tags", "Tags", "text", t?.tags) +
+      field("location", "Location", "text", t?.location) +
+      extraTaskFields(t) +
+      area(
+        "children",
+        "Subtasks (one per line)",
+        t?.children.map((s) => s.title).join("\n"),
+      ),
+    async (f) => {
+      let file = f.removeFile ? null : t?.file;
+      if (f.attachment?.size) {
+        if (f.attachment.size > 1000000)
+          throw Error("Choose a file under 1 MB");
+        file = { name: f.attachment.name, data: await readFile(f.attachment) };
+      }
+      delete f.attachment;
+      const next = {
+        ...f,
+        file,
+        id: t?.id || id(),
+        done: t?.done || false,
+        children: f.children
+          .split("\n")
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .map((title) => ({
+            title,
+            done: t?.children.find((x) => x.title === title)?.done || false,
+          })),
+      };
+      if (next.time && !next.date) throw Error("Choose a date for this time");
+      if (t) {
+        if (f.scope === "series") editFollowing(t, next);
+        Object.assign(t, next);
+        if (t.done !== Boolean(f.completed)) complete(t);
+      } else state.tasks.push(next);
+    },
+  );
+}
+function complete(t) {
+  t.done = !t.done;
+  if (t.done)
+    state.receipts[t.id] = {
+      title: t.title,
+      skill: project(t.project)?.skill || "",
+      xp: state.config?.xp ?? 25,
+      coins: state.config?.coins ?? 4,
+    };
+  else delete state.receipts[t.id];
+  if (t.done) {
+    repeatAfter(t);
+    feedback();
+  }
+  save();
+}
+function row(t) {
+  const p = project(t.project);
+  return (
+    '<div data-priority="' +
+    safe(t.priority) +
+    '" class="row ' +
+    (t.priority === "Goal" ? "goal" : "") +
+    '" draggable="true" data-task="' +
+    t.id +
+    '"><input aria-label="Complete ' +
+    safe(t.title) +
+    '" type="checkbox" data-act="complete" data-key="' +
+    t.id +
+    '" ' +
+    (t.done ? "checked" : "") +
+    '><div class="grow">' +
+    button(safe(t.title), "edit", t.id) +
+    '<div class="pill">' +
+    button(image(p) + safe(p?.name || "Personal"), "assign", t.id) +
+    " · " +
+    safe(t.priority) +
+    " · " +
+    t.minutes +
+    "m · " +
+    t.children.filter((s) => s.done).length +
+    "/" +
+    t.children.length +
+    " subtasks</div>" +
+    t.children
+      .map(
+        (s, i) =>
+          '<label><span><input type="checkbox" data-act="sub" data-key="' +
+          t.id +
+          '" data-i="' +
+          i +
+          '" ' +
+          (s.done ? "checked" : "") +
+          "> " +
+          safe(s.title) +
+          "</span></label>",
+      )
+      .join("") +
+    "</div></div>"
+  );
+}
+function agenda() {
+  let p = project(view);
+  let tasks = state.tasks
+    .filter(inList)
+    .filter((t) =>
+      listFilters.includes(view)
+        ? true
+        : p
+          ? t.project === p.id
+          : view === "Tasks"
+            ? true
+            : view === "Inbox"
+              ? !t.date
+              : t.date === date,
+    );
+  return (
+    '<div class="card"><div class="bar"><h2>' +
+    safe(p?.name || "Agenda") +
+    "</h2>" +
+    button("＋ Add task", "add") +
+    "</div>" +
+    (p
+      ? image(p) +
+        safe(p.stage || "In progress") +
+        " · " +
+        safe(p.skill) +
+        " " +
+        button("Edit project", "project", p.id)
+      : "") +
+    [false, true]
+      .map((done) => {
+        let group = tasks.filter((t) => t.done === done);
+        return (
+          "<h4>" +
+          (done ? "DONE" : "TO-DOS") +
+          " · " +
+          group.length +
+          " / " +
+          group.reduce((n, t) => n + Number(t.minutes), 0) +
+          " MIN</h4>" +
+          group.map(row).join("")
+        );
+      })
+      .join("") +
+    (!tasks.length
+      ? "<p>Capture a task and give it a place in your day.</p>"
+      : "") +
+    "</div>"
+  );
+}
+function shift(n) {
+  let d = new Date(date + "T12:00");
+  if (range === "Month") {
+    d.setDate(1);
+    d.setMonth(d.getMonth() + n);
+  } else
+    d.setDate(d.getDate() + n * (range === "Week" ? 7 : parseInt(range) || 1));
+  date = day(d);
+  if (view === "Today" || view === "Overview") view = "Agenda";
+  render();
+}
+function calendar() {
+  let d = new Date(date + "T12:00");
+  let days = range === "Week" ? 7 : parseInt(range) || 1;
+  if (range === "Month") {
+    d.setDate(1);
+    days = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  }
+  let rows = "";
+  for (let i = 0; i < days; i++, d.setDate(d.getDate() + 1)) {
+    let ds = day(d);
+    let scheduled = state.tasks
+      .filter((t) => !t.trashed && t.date === ds && t.time)
+      .sort((a, b) => a.time.localeCompare(b.time));
+    if (days > 1) {
+      rows +=
+        '<div class="slot" data-date="' +
+        ds +
+        '"><small>' +
+        ds.slice(5) +
+        "</small>" +
+        scheduled
+          .map((t) =>
+            button(
+              image(project(t.project)) + t.time + " " + safe(t.title),
+              "edit",
+              t.id,
+            ),
+          )
+          .join("") +
+        "</div>";
+      continue;
+    }
+    let hours = [
+      ...new Set([
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        ...scheduled.map((t) => Number(t.time.slice(0, 2))),
+      ]),
+    ].sort((a, b) => a - b);
+    rows += hours
+      .map(
+        (h) =>
+          '<div class="slot" data-date="' +
+          ds +
+          '" data-hour="' +
+          h +
+          '"><small>' +
+          String(h).padStart(2, "0") +
+          ":00</small>" +
+          scheduled
+            .filter((t) => Number(t.time.slice(0, 2)) === h)
+            .map((t) =>
+              button(
+                image(project(t.project)) + safe(t.title) + " · " + t.time,
+                "edit",
+                t.id,
+              ),
+            )
+            .join("") +
+          "</div>",
+      )
+      .join("");
+  }
+  return (
+    '<div class="card"><h2>Calendar</h2><div class="bar">' +
+    button("‹", "prev") +
+    button("Today", "reset") +
+    button("›", "next") +
+    '<select aria-label="Calendar range" id="range">' +
+    ["Day", "2 days", "3 days", "4 days", "5 days", "6 days", "Week", "Month"]
+      .map(
+        (v) =>
+          "<option " + (v === range ? "selected" : "") + ">" + v + "</option>",
+      )
+      .join("") +
+    "</select></div>" +
+    googleAgenda() +
+    rows +
+    "</div>"
+  );
+}
+function skills() {
+  return state.skills
+    .map(
+      (s) =>
+        "<p>" +
+        button(safe(s), "nav", "Skill / " + s) +
+        " · Lv " +
+        (1 + Math.floor(total("xp", s) / (state.config?.threshold || 100))) +
+        '<progress max="' +
+        (state.config?.threshold || 100) +
+        '" value="' +
+        (total("xp", s) % (state.config?.threshold || 100)) +
+        '"></progress>' +
+        total("xp", s) +
+        " XP</p>",
+    )
+    .join("");
+}
+function summary() {
+  return (
+    '<section class="summary"><div class="card"><h2>' +
+    image({ image: state.config?.portrait }) +
+    safe(state.profile) +
+    "</h2>Level " +
+    (1 + Math.floor(total("xp") / (state.config?.threshold || 100))) +
+    " · " +
+    total("xp") +
+    " XP · " +
+    (total("coins") - state.spent) +
+    ' coins<progress max="' +
+    (state.config?.threshold || 100) +
+    '" value="' +
+    (total("xp") % (state.config?.threshold || 100)) +
+    '"></progress>HP ' +
+    Math.max(
+      0,
+      100 - (state.battles || []).reduce((n, b) => n + b.log.length, 0),
+    ) +
+    '/100</div><div class="card"><h2>Skills</h2>' +
+    skills() +
+    '</div><div class="card"><h2>Daily check-in</h2>' +
+    button(
+      state.diary[now] ? "Read today’s entry" : "Write a reflection",
+      "nav",
+      "Diary",
+    ) +
+    "</div></section>"
+  );
+}
+function habits() {
+  return (
+    button("＋ New habit", "habit") +
+    state.habits
+      .map(
+        (h) =>
+          '<div class="card"><h2>' +
+          safe(h.title) +
+          "</h2>" +
+          safe(h.skill) +
+          " · " +
+          streak(h) +
+          " day streak · 10 XP · 2 coins " +
+          button(
+            state.receipts[h.id + now] ? "Undo check-in" : "Check in",
+            "check",
+            h.id,
+          ) +
+          "</div>",
+      )
+      .join("")
+  );
+}
+function render() {
+  document.documentElement.classList.toggle("black", state.theme === "Black");
+  $("#theme").textContent = "◐  " + state.theme + " mode";
+  let nav = [
+    "Overview",
+    "Inbox",
+    "Today",
+    "Tasks",
+    "Projects",
+    "openGym",
+    "Skills",
+    "Habits",
+    "Diary",
+    "Market",
+    "Settings",
+  ];
+  $("#nav").innerHTML = nav
+    .map((x) =>
+      button(
+        x +
+          (x === "Inbox"
+            ? " · " + state.tasks.filter((t) => !t.date && !t.done).length
+            : ""),
+        "nav",
+        x,
+        'class="' + (view === x ? "active" : "") + '"',
+      ),
+    )
+    .join("");
+  $("#projects").innerHTML = Array.from(
+    new Set(state.projects.map((p) => p.folder || "")),
+  )
+    .map(
+      (folder) =>
+        (folder ? "<h4>" + safe(folder) + "</h4>" : "") +
+        state.projects
+          .filter((p) => (p.folder || "") === folder)
+          .map((p) => button(image(p) + safe(p.name), "nav", p.id))
+          .join(""),
+    )
+    .join("");
+  let body = extendedPage();
+  if (body !== null) {
+  } else if (view === "openGym")
+    body =
+      '<p><a target="_blank" rel="noopener" href="' +
+      safe(gymURL) +
+      '">Open standalone openGym</a></p><iframe title="Native openGym" src="' +
+      safe(gymURL) +
+      '" style="width:100%;height:78vh;border:0"></iframe>';
+  else if (view === "Diary")
+    body =
+      area("entry", "Today’s reflection", state.diary[now]) +
+      button("Save entry", "diary") +
+      field("diaryFilter", "Search saved entries", "search", "") +
+      Object.entries(state.diary)
+        .reverse()
+        .map(
+          ([d, v]) =>
+            '<article data-entry class="card"><small>' +
+            d +
+            "</small><p>" +
+            safe(v) +
+            "</p></article>",
+        )
+        .join("");
+  else if (view === "Skills")
+    body =
+      button("New skill", "newSkill") +
+      skills() +
+      earned()
+        .map(
+          (r) =>
+            '<div class="row">' +
+            safe(r.title) +
+            " · " +
+            safe(r.skill) +
+            " +" +
+            r.xp +
+            " XP</div>",
+        )
+        .join("");
+  else if (view === "Habits") body = habits();
+  else if (view === "Settings")
+    body =
+      button("Edit profile", "profile") +
+      settingsPlus() +
+      googleSettings() +
+      availabilityPanel() +
+      mcpPanel();
+  else if (view === "Market")
+    body =
+      button("Create reward", "reward") +
+      state.shop
+        .map(
+          (r) =>
+            "<p>" +
+            safe(r.title) +
+            " " +
+            button("Redeem · " + r.cost + " coins", "redeem", r.id) +
+            "</p>",
+        )
+        .join("");
+  else
+    body =
+      '<div class="grid">' +
+      agenda() +
+      calendar() +
+      "</div>" +
+      (view === "Overview"
+        ? summary() + fitnessSummary() + habits() + contentHub()
+        : "");
+  $("#screen").innerHTML =
+    '<div class="hero"><small>' +
+    new Date(date + "T12:00")
+      .toLocaleDateString(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      })
+      .toUpperCase() +
+    "</small><h1>" +
+    safe(project(view)?.name || view) +
+    "</h1></div>" +
+    body;
+  tick();
+}
+document.addEventListener("click", (e) => {
+  let b = e.target.closest("[data-act]");
+  if (!b) return;
+  let k = b.dataset.key,
+    t = state.tasks.find((x) => x.id === k);
+  switch (b.dataset.act) {
+    case "nav":
+      view = k;
+      if (k === "Today") {
+        date = now;
+        range = "Day";
+      }
+      render();
+      break;
+    case "close":
+      $("#modal").close();
+      break;
+    case "project":
+      projectForm(project(k));
+      break;
+    case "edit":
+      taskForm(t);
+      break;
+    case "add":
+      taskForm();
+      break;
+    case "complete":
+      complete(t);
+      break;
+    case "sub":
+      t.children[b.dataset.i].done = b.checked;
+      save();
+      break;
+    case "reset":
+      view = "Today";
+      date = now;
+      range = "Day";
+      render();
+      break;
+    case "prev":
+      shift(-1);
+      break;
+    case "next":
+      shift(1);
+      break;
+    case "diary":
+      state.diary[now] = $("[name=entry]").value;
+      save();
+      break;
+    case "profile":
+      dialog(
+        "Profile",
+        field("name", "Display name", "text", state.profile, "required"),
+        (f) => (state.profile = f.name),
+      );
+      break;
+    case "habit":
+      dialog(
+        "Create habit",
+        field("title", "Habit", "text", "", "required") +
+          select(
+            "skill",
+            "Skill",
+            state.skills.map((s) => [s, s]),
+          ),
+        (f) => state.habits.push({ ...f, id: id() }),
+      );
+      break;
+    case "check": {
+      let h = state.habits.find((h) => h.id === k),
+        key = k + now;
+      if (state.receipts[key]) delete state.receipts[key];
+      else
+        state.receipts[key] = {
+          title: h.title,
+          skill: h.skill,
+          xp: 10,
+          coins: 2,
+        };
+      save();
+      break;
+    }
+    case "reward":
+      dialog(
+        "Personal reward",
+        field("title", "Reward", "text", "", "required") +
+          field("cost", "Coin price", "number", 10, 'min="1" required'),
+        (f) => state.shop.push({ ...f, id: id() }),
+      );
+      break;
+    case "redeem": {
+      let r = state.shop.find((r) => r.id === k);
+      if (total("coins") - state.spent >= r.cost) {
+        state.spent += Number(r.cost);
+        save();
+      } else alert("Earn more coins to redeem this reward.");
+      break;
+    }
+  }
+});
+document.addEventListener("change", (e) => {
+  if (e.target.id === "range") {
+    range = e.target.value;
+    render();
+  }
+});
+document.addEventListener("dragstart", (e) => {
+  let r = e.target.closest("[data-task]");
+  if (r) e.dataTransfer.setData("text/plain", r.dataset.task);
+});
+document.addEventListener("dragover", (e) => {
+  if (e.target.closest(".slot")) e.preventDefault();
+});
+document.addEventListener("drop", (e) => {
+  let slot = e.target.closest(".slot");
+  if (!slot) return;
+  e.preventDefault();
+  let t = state.tasks.find(
+    (t) => t.id === e.dataTransfer.getData("text/plain"),
+  );
+  if (t) {
+    t.date = slot.dataset.date;
+    t.time = slot.dataset.hour
+      ? slot.dataset.hour.padStart(2, "0") + ":00"
+      : t.time || "09:00";
+    save();
+  }
+});
+$("#theme").onclick = () => {
+  state.theme = state.theme === "Light" ? "Black" : "Light";
+  save();
+};
+$("#newProject").onclick = () => projectForm();
+function tick() {
+  let t = state.timer;
+  let left = t.end
+    ? Math.max(0, Math.ceil((t.end - Date.now()) / 1000))
+    : t.left;
+  $("#timer").textContent =
+    t.mode +
+    " · " +
+    Math.floor(left / 60) +
+    ":" +
+    String(left % 60).padStart(2, "0");
+}
+$("#timer").onclick = () => {
+  let t = state.timer;
+  dialog(
+    "Focus timer",
+    select(
+      "mode",
+      "Mode",
+      ["Focus", "Break", "Long break"].map((s) => [s, s]),
+      t.mode,
+    ) +
+      select(
+        "task",
+        "Link a task",
+        [
+          ["", "No task"],
+          ...state.tasks
+            .filter((t) => !t.done && !t.trashed)
+            .map((t) => [t.id, t.title]),
+        ],
+        t.task || "",
+      ) +
+      select("action", "Timer", [
+        [t.end ? "pause" : "start", t.end ? "Pause" : "Start / resume"],
+        ["reset", "Reset"],
+      ]),
+    (f) => {
+      let seconds =
+        state.config?.durations?.[f.mode] * 60 ||
+        { Focus: 1500, Break: 300, "Long break": 900 }[f.mode];
+      let left =
+        f.mode === t.mode
+          ? t.end
+            ? Math.max(0, Math.ceil((t.end - Date.now()) / 1000))
+            : t.left
+          : seconds;
+      state.timer = {
+        task: f.task,
+        mode: f.mode,
+        left: f.action === "reset" ? seconds : left,
+        end:
+          f.action === "start" ? Date.now() + (left || seconds) * 1000 : null,
+      };
+    },
+  );
+};
+document.addEventListener("keydown", (e) => {
+  if (
+    e.key.toLowerCase() === "c" &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !$("#modal").open &&
+    !e.target.matches("input,textarea,select")
+  ) {
+    e.preventDefault();
+    taskForm();
+  }
+});
+let overlays = {};
+
+function fitnessSummary() {
+  const latest = Object.entries(state.receipts)
+    .filter(([k]) => k.startsWith("gym:"))
+    .map(([, v]) => v)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+  return (
+    '<div class="card"><h2>Training</h2><p>' +
+    safe(latest?.title || "Open your workout plan") +
+    "</p>" +
+    button("Open training", "nav", "openGym") +
+    "</div>"
+  );
+}
+window.addEventListener("message", (event) => {
+  if (
+    window.lifeosHosted ||
+    event.origin !== new URL(gymURL).origin ||
+    event.source !== document.querySelector("iframe")?.contentWindow ||
+    event.data?.type !== "lifeos-sessions" ||
+    !Array.isArray(event.data.sessions)
+  )
+    return;
+  const receipts = Object.fromEntries(
+    Object.entries(state.receipts).filter(([k]) => !k.startsWith("gym:")),
+  );
+  for (const w of event.data.sessions)
+    if (typeof w.id === "string")
+      receipts["gym:" + w.id] = {
+        title: w.name,
+        date: w.date,
+        skill: "Gym",
+        xp: 25,
+        coins: 4,
+      };
+  if (JSON.stringify(state.receipts) !== JSON.stringify(receipts)) {
+    state.receipts = receipts;
+    localStorage.setItem("lifeos", JSON.stringify(state));
+    if (window.lifeosHosted) queueCloud();
+  }
 });
 
+function googleSettings() {
+  return (
+    '<section class="card"><h2>Google Calendar</h2><a href="/google/connect">Connect account</a> ' +
+    button("Load calendars", "google") +
+    ' <a href="/google/connect?write">Authorize time blocking</a> ' +
+    button("Time blocking", "lockSettings") +
+    '<p id="syncState"></p>' +
+    '<div id="accounts"></div></section>'
+  );
+}
 
-function googleSettings(){
- return '<section class="card"><h2>Google Calendar</h2><a href="/google/connect">Connect account</a> '+button('Load calendars','google')+'<div id="accounts"></div></section>';
+function googleAgenda() {
+  const entries = Object.values(overlays)
+    .flat()
+    .filter(
+      (e) =>
+        (e.start?.length === 10 ? e.start : day(new Date(e.start))) === date,
+    );
+  return entries
+    .map(
+      (e) =>
+        '<p class="pill">Calendar · ' +
+        safe(e.title) +
+        " · " +
+        safe(e.start) +
+        "</p>",
+    )
+    .join("");
 }
-let overlays={};
-function googleAgenda(){
- const entries=Object.values(overlays).flat().filter(e=>(e.start?.length===10?e.start:day(new Date(e.start)))===date);
- return entries.map(e=>'<p class="pill">Calendar · '+safe(e.title)+' · '+safe(e.start)+'</p>').join('');
-}
-document.addEventListener('click',async e=>{
- if(e.target.dataset.act!=='google')return;
- const box=$('#accounts');
- try{const data=await (await fetch('/google/calendars')).json();if(!data.connected){box.textContent=data.error||'Connect a Google account first.';return}
- box.innerHTML=data.list.map(c=>'<label><span><input type="checkbox" data-overlay="'+safe(c.id)+'" '+(overlays[c.id]?'checked':'')+'> '+safe(c.name)+'</span></label>').join('');
- }catch{box.textContent='Calendar service unavailable.'}
+document.addEventListener("click", async (e) => {
+  if (e.target.dataset.act !== "google") return;
+  const box = $("#accounts");
+  try {
+    const data = await (await fetch("/google/calendars")).json();
+    if (!data.connected) {
+      box.textContent = data.error || "Connect a Google account first.";
+      return;
+    }
+    box.innerHTML = data.list
+      .map(
+        (c) =>
+          '<label><span><input type="checkbox" data-overlay="' +
+          safe(c.id) +
+          '" ' +
+          (overlays[c.id] ? "checked" : "") +
+          "> " +
+          safe(c.name) +
+          "</span></label>",
+      )
+      .join("");
+  } catch {
+    box.textContent = "Calendar service unavailable.";
+  }
 });
-document.addEventListener('change',async e=>{
- const key=e.target.dataset.overlay;if(!key)return;if(!e.target.checked){delete overlays[key];return}
- try{const data=await(await fetch('/google/events?id='+encodeURIComponent(key))).json();if(!data.events)throw Error(data.error||'Reconnect your account');if(e.target.checked)overlays[key]=data.events;}catch(err){e.target.checked=false;alert(err.message)}
+document.addEventListener("change", async (e) => {
+  const key = e.target.dataset.overlay;
+  if (!key) return;
+  if (!e.target.checked) {
+    delete overlays[key];
+    return;
+  }
+  try {
+    const data = await (
+      await fetch("/google/events?id=" + encodeURIComponent(key))
+    ).json();
+    if (!data.events) throw Error(data.error || "Reconnect your account");
+    if (e.target.checked) overlays[key] = data.events;
+  } catch (err) {
+    e.target.checked = false;
+    alert(err.message);
+  }
+});
+
+function advanceDate(ds, rule) {
+  const d = new Date(ds + "T12:00");
+  d.setDate(d.getDate() + (rule === "Weekly" ? 7 : 1));
+  if (rule === "Weekdays")
+    while ([0, 6].includes(d.getDay())) d.setDate(d.getDate() + 1);
+  if (rule === "Monthly") {
+    const original = new Date(ds + "T12:00");
+    const end = new Date(original.getFullYear(), original.getMonth() + 2, 0);
+    end.setDate(Math.min(original.getDate(), end.getDate()));
+    return day(end);
+  }
+  return day(d);
+}
+function editFollowing(t, next) {
+  for (const later of state.tasks.filter(
+    (x) =>
+      x.id !== t.id &&
+      !x.done &&
+      (x.series || x.id) === (t.series || t.id) &&
+      x.date >= t.date,
+  )) {
+    for (const k of [
+      "title",
+      "repeat",
+      "time",
+      "project",
+      "notes",
+      "minutes",
+      "priority",
+    ])
+      later[k] = next[k];
+  }
+}
+function repeatAfter(t) {
+  if (!t.repeat || t.repeat === "None" || !t.date) return;
+  const next = advanceDate(t.date, t.repeat);
+  if (state.tasks.some((x) => x.previous === t.id)) return;
+  state.tasks.push({
+    ...t,
+    id: id(),
+    previous: t.id,
+    series: t.series || t.id,
+    date: next,
+    done: false,
+    children: t.children.map((s) => ({ ...s, done: false })),
+  });
+}
+function readFile(file) {
+  return new Promise((resolve, reject) => {
+    const f = new FileReader();
+    f.onload = () => resolve(f.result);
+    f.onerror = () => reject(Error("File could not be opened"));
+    f.readAsDataURL(file);
+  });
+}
+function extraTaskFields(t) {
+  return (
+    (t
+      ? button(
+          t.trashed ? "Restore task" : "Move to Trash",
+          "trash",
+          t.id,
+          'type="button"',
+        )
+      : "") +
+    select(
+      "repeat",
+      "Repeat",
+      ["None", "Daily", "Weekdays", "Weekly", "Monthly"].map((v) => [v, v]),
+      t?.repeat || "None",
+    ) +
+    (t
+      ? select(
+          "scope",
+          "Apply edits to",
+          [
+            ["one", "This occurrence"],
+            ["series", "This and following occurrences"],
+          ],
+          "one",
+        )
+      : "") +
+    '<output id="nextRepeat"></output>' +
+    field("attachment", "Attach a file", "file", "") +
+    (t?.file
+      ? '<a download="' +
+        safe(t.file.name) +
+        '" href="' +
+        safe(t.file.data) +
+        '">Download ' +
+        safe(t.file.name) +
+        '</a><label><span><input name="removeFile" type="checkbox"> Remove attachment</span></label>'
+      : "") +
+    (t
+      ? '<label><span><input name="completed" type="checkbox" ' +
+        (t.done ? "checked" : "") +
+        "> Completed</span></label>"
+      : "")
+  );
+}
+document.addEventListener("input", () => {
+  const out = $("#nextRepeat");
+  if (!out) return;
+  const f = $("#form");
+  out.textContent =
+    f.repeat.value !== "None" && f.date.value
+      ? "Next occurrence · " + advanceDate(f.date.value, f.repeat.value)
+      : "";
+});
+
+function contentHub() {
+  return (
+    '<section class="card hub"><h2>Progress</h2><div class="bar">' +
+    [
+      "Habits",
+      "Battle",
+      "Goals",
+      "Projects",
+      "Market",
+      "Journal",
+      "Profile",
+      "Settings",
+    ]
+      .map((v) => button(safe(v), "nav", v))
+      .join("") +
+    "</div></section>"
+  );
+}
+function extendedPage() {
+  if (view.startsWith("Skill / ")) {
+    const skill = view.slice(8);
+    return (
+      "<h2>Projects</h2>" +
+      state.projects
+        .filter((p) => p.skill === skill)
+        .map((p) => button(image(p) + safe(p.name), "nav", p.id))
+        .join("") +
+      "<h2>Activity</h2>" +
+      earned()
+        .filter((r) => r.skill === skill)
+        .map((r) => "<p>" + safe(r.title) + " · " + r.xp + " XP</p>")
+        .join("")
+    );
+  }
+  if (view === "Projects")
+    return (
+      button("New project", "project", "") +
+      state.projects
+        .map(
+          (p) =>
+            '<div class="row">' +
+            button(image(p) + safe(p.name), "nav", p.id) +
+            " · " +
+            safe(p.skill) +
+            "</div>",
+        )
+        .join("")
+    );
+  if (view === "Journal")
+    return (
+      earned()
+        .map(
+          (r) =>
+            '<div class="row">' +
+            safe(r.title) +
+            " · " +
+            safe(r.skill) +
+            " · " +
+            r.xp +
+            " XP</div>",
+        )
+        .join("") || "<p>No activity yet.</p>"
+    );
+  if (view === "Profile")
+    return (
+      summary() +
+      ["objective", "strength", "growth"]
+        .map(
+          (k) =>
+            "<p>" + safe(k) + " · " + safe(state.config?.[k] || "—") + "</p>",
+        )
+        .join("") +
+      button("Edit identity", "identity")
+    );
+  if (view === "Battle")
+    return (
+      button("Add bad habit", "newBattle") +
+      (state.battles || [])
+        .map(
+          (b) =>
+            '<div class="card">' +
+            safe(b.name) +
+            " · " +
+            (b.log || []).length +
+            " lapses " +
+            button("Log lapse", "lapse", b.id) +
+            button("Undo last", "undoLapse", b.id) +
+            "</div>",
+        )
+        .join("")
+    );
+  if (view === "Goals")
+    return (
+      button("New objective", "newGoal") +
+      (state.goals || [])
+        .map(
+          (g) =>
+            '<div class="card">' +
+            safe(g.name) +
+            " " +
+            button(g.done ? "Reopen" : "Complete", "goal", g.id) +
+            "</div>",
+        )
+        .join("")
+    );
+  return null;
+}
+function settingsPlus() {
+  return (
+    '<section class="card"><h2>Preferences</h2><div class="bar">' +
+    ["Identity", "Rewards", "Focus", "Rituals", "Sounds", "Calendar defaults"]
+      .map((s) => button(s, "prefs", s))
+      .join("") +
+    "</div></section>"
+  );
+}
+function prefs(k) {
+  const cfg = (state.config ||= {});
+  if (k === "Identity") {
+    dialog(
+      "Character profile",
+      field("name", "Name", "text", state.profile, "required") +
+        field("portrait", "Portrait", "file", "", 'accept="image/*"') +
+        area("objective", "Objective", cfg.objective) +
+        area("strength", "Strengths", cfg.strength) +
+        area("growth", "Areas to develop", cfg.growth),
+      async (f) => {
+        state.profile = f.name;
+        Object.assign(cfg, {
+          portrait: (await picture(f.portrait)) || cfg.portrait,
+          objective: f.objective,
+          strength: f.strength,
+          growth: f.growth,
+        });
+      },
+    );
+    return;
+  }
+  if (k === "Rewards") {
+    dialog(
+      "Reward settings",
+      field("xp", "Task XP", "number", cfg.xp ?? 25, 'min="0" required') +
+        field(
+          "coins",
+          "Task coins",
+          "number",
+          cfg.coins ?? 4,
+          'min="0" required',
+        ) +
+        field(
+          "threshold",
+          "XP per level",
+          "number",
+          cfg.threshold ?? 100,
+          'min="1" required',
+        ) +
+        field("adjust", "Adjust coin balance", "number", 0) +
+        field("reason", "Reason for adjustment", "text", ""),
+      (f) => {
+        if (+f.adjust && !f.reason.trim())
+          throw Error("Give a reason for the balance adjustment");
+        Object.assign(cfg, {
+          xp: +f.xp,
+          coins: +f.coins,
+          threshold: +f.threshold,
+        });
+        if (+f.adjust)
+          state.receipts[id()] = {
+            title: f.reason,
+            coins: +f.adjust,
+            xp: 0,
+            skill: "",
+          };
+      },
+    );
+    return;
+  }
+  if (k === "Focus") {
+    dialog(
+      "Focus durations",
+      ["Focus", "Break", "Long break"]
+        .map((v, i) =>
+          field(
+            "d" + i,
+            v + " minutes",
+            "number",
+            cfg.durations?.[v] || [25, 5, 15][i],
+            'min="1" required',
+          ),
+        )
+        .join(""),
+      (f) =>
+        (cfg.durations = { Focus: +f.d0, Break: +f.d1, "Long break": +f.d2 }),
+    );
+    return;
+  }
+  if (k === "Rituals") {
+    let names = [
+      "Daily planning",
+      "Daily shutdown",
+      "Weekly planning",
+      "Weekly shutdown",
+    ];
+    dialog(
+      "Planning rituals",
+      names
+        .map(
+          (n, i) =>
+            field("t" + i, n, "time", cfg.rituals?.[i]?.time) +
+            field(
+              "days" + i,
+              "Days (0 Sunday – 6 Saturday)",
+              "text",
+              cfg.rituals?.[i]?.days || "1,2,3,4,5",
+            ) +
+            select(
+              "auto" + i,
+              "Trigger",
+              [
+                ["manual", "Manual"],
+                ["auto", "Automatic"],
+              ],
+              cfg.rituals?.[i]?.trigger,
+            ),
+        )
+        .join(""),
+      (f) =>
+        (cfg.rituals = names.map((name, i) => ({
+          name,
+          time: f["t" + i],
+          days: f["days" + i],
+          trigger: f["auto" + i],
+        }))),
+    );
+    return;
+  }
+  if (k === "Sounds") {
+    dialog(
+      "Completion cues",
+      field("coin", "Coin sound", "file", "", 'accept="audio/mpeg"') +
+        field("xp", "XP fireworks sound", "file", "", 'accept="audio/mpeg"') +
+        field(
+          "volume",
+          "Volume",
+          "range",
+          cfg.volume ?? 50,
+          'min="0" max="100"',
+        ) +
+        select(
+          "effect",
+          "Animation",
+          [
+            ["pulse", "Pulse"],
+            ["spark", "Spark"],
+            ["off", "Off"],
+          ],
+          cfg.effect,
+        ),
+      async (f) => {
+        for (const key of ["xp", "coin"])
+          if (f[key].size) {
+            if (f[key].size > 600000)
+              throw Error("Use a short clip under 600 KB");
+            cfg[key + "Sound"] = await readFile(f[key]);
+          }
+        cfg.volume = +f.volume;
+        cfg.effect = f.effect;
+      },
+    );
+    return;
+  }
+  dialog(
+    "Calendar defaults",
+    field(
+      "task",
+      "Task duration",
+      "number",
+      cfg.task || 30,
+      'min="1" required',
+    ) +
+      field(
+        "event",
+        "Event duration",
+        "number",
+        cfg.event || 30,
+        'min="1" required',
+      ) +
+      field(
+        "slot",
+        "Time slot duration",
+        "number",
+        cfg.slot || 60,
+        'min="1" required',
+      ),
+    (f) => Object.assign(cfg, f),
+  );
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-act]");
+  if (!b) return;
+  const k = b.dataset.key;
+  if (b.dataset.act === "prefs") prefs(k);
+  if (b.dataset.act === "identity") prefs("Identity");
+  if (["newBattle", "newGoal"].includes(b.dataset.act)) {
+    const key = b.dataset.act === "newBattle" ? "battles" : "goals";
+    dialog(
+      key === "goals" ? "Objective" : "Battle",
+      field("name", "Name", "text", "", "required"),
+      (f) => (state[key] ||= []).push({ id: id(), name: f.name, log: [] }),
+    );
+  }
+  if (["lapse", "undoLapse"].includes(b.dataset.act)) {
+    const battle = state.battles.find((x) => x.id === k);
+    if (b.dataset.act === "lapse") battle.log.push(new Date().toISOString());
+    else battle.log.pop();
+    save();
+  }
+  if (b.dataset.act === "goal") {
+    const g = state.goals.find((x) => x.id === k);
+    g.done = !g.done;
+    save();
+  }
+});
+function feedback() {
+  const c = state.config || {};
+  for (const sound of [c.coinSound, c.xpSound])
+    if (sound && c.volume) {
+      const a = new Audio(sound);
+      a.volume = c.volume / 100;
+      a.play().catch(() => {});
+    }
+  if (
+    c.effect !== "off" &&
+    !matchMedia("(prefers-reduced-motion: reduce)").matches
+  )
+    $("#screen").animate([{ opacity: 0.75 }, { opacity: 1 }], 220);
+}
+function streak(h) {
+  let d = new Date();
+  if (!state.receipts[h.id + day(d)]) d.setDate(d.getDate() - 1);
+  let n = 0;
+  while (state.receipts[h.id + day(d)]) {
+    n++;
+    d.setDate(d.getDate() - 1);
+  }
+  return n;
+}
+
+let pendingShare = Promise.resolve();
+function sharePlanner(enabled) {
+  const tasks = state.tasks.map((t) => ({
+    title: t.title,
+    date: t.date,
+    time: t.time,
+    done: t.done,
+    project: project(t.project)?.name,
+  }));
+  const body = JSON.stringify({ enabled, tasks });
+  pendingShare = pendingShare
+    .catch(() => {})
+    .then(async () => {
+      const r = await fetch("/mcp/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      if (!r.ok) throw Error("Could not update planner sharing");
+    });
+  return pendingShare;
+}
+function mcpPanel() {
+  return (
+    '<section class="card"><h2>AI planner access</h2><p>Share project names, task titles, schedule and completion status with a local MCP client. Run node mcp.mjs from this checkout.</p>' +
+    button(state.mcp ? "Disconnect read access" : "Enable read access", "mcp") +
+    "</section>"
+  );
+}
+document.addEventListener("click", async (e) => {
+  if (e.target.closest('[data-act="mcp"]')) {
+    try {
+      const next = !state.mcp;
+      if (!window.lifeosHosted) await sharePlanner(next);
+      state.mcp = next;
+      save();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+});
+function watchRituals() {
+  if ($("#modal").open) return;
+  const d = new Date();
+  const stamp = day(d);
+  for (const r of state.config?.rituals || []) {
+    const key = r.name + stamp;
+    if (
+      r.trigger !== "auto" ||
+      !r.days
+        .split(",")
+        .map((v) => v.trim())
+        .includes(String(d.getDay())) ||
+      r.time !== d.toTimeString().slice(0, 5) ||
+      state.lastRitual === key
+    )
+      continue;
+    state.lastRitual = key;
+    dialog(
+      r.name,
+      area("reflection", "What will you carry forward?"),
+      (f) =>
+        (state.diary[stamp] = [
+          state.diary[stamp],
+          r.name + " · " + f.reflection,
+        ]
+          .filter(Boolean)
+          .join("\n")),
+    );
+    break;
+  }
+}
+setInterval(watchRituals, 15000);
+
+const listFilters = [
+  "Upcoming",
+  "Tomorrow",
+  "Next 7 Days",
+  "This Week",
+  "This Month",
+  "Someday",
+  "Done",
+  "Trashed",
+];
+function inList(t) {
+  const tomorrow = new Date(now + "T12:00");
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (view === "Trashed") return !!t.trashed;
+  if (t.trashed) return false;
+  if (view === "Tomorrow") return t.date === day(tomorrow);
+  if (view === "Upcoming") return t.date > now;
+  if (view === "Someday") return !t.date && !t.done;
+  if (view === "Done") return t.done;
+  if (view === "This Month") return t.date?.slice(0, 7) === now.slice(0, 7);
+  if (view === "This Week" || view === "Next 7 Days") {
+    const first = new Date(now + "T12:00");
+    if (view === "This Week")
+      first.setDate(first.getDate() - ((first.getDay() + 6) % 7));
+    const last = new Date(first);
+    last.setDate(first.getDate() + 6);
+    return t.date >= day(first) && t.date <= day(last);
+  }
+  return true;
+}
+function findTask() {
+  dialog(
+    "Find a task",
+    field("search", "Search by title or project", "search", "") +
+      '<div id="matches"></div>',
+    () => {},
+  );
+  const input = $("[name=search]");
+  input.oninput = () => {
+    $("#matches").innerHTML = state.tasks
+      .filter(
+        (t) =>
+          !t.trashed &&
+          (t.title + " " + (project(t.project)?.name || ""))
+            .toLowerCase()
+            .includes(input.value.toLowerCase()),
+      )
+      .slice(0, 15)
+      .map((t) => button(safe(t.title), "found", t.id, 'type="button"'))
+      .join("");
+  };
+  input.oninput();
+  input.focus();
+}
+document.addEventListener("keydown", (e) => {
+  if (
+    (e.ctrlKey || e.metaKey) &&
+    e.key.toLowerCase() === "k" &&
+    !$("#modal").open
+  ) {
+    e.preventDefault();
+    findTask();
+  }
+});
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-act]");
+  if (!b) return;
+  if (b.dataset.act === "found") {
+    const t = state.tasks.find((x) => x.id === b.dataset.key);
+    $("#modal").close();
+    taskForm(t);
+  }
+  if (b.dataset.act === "search") findTask();
+  if (b.dataset.act === "trash") {
+    const t = state.tasks.find((x) => x.id === b.dataset.key);
+    t.trashed = !t.trashed;
+    $("#modal").close();
+    save();
+  }
+});
+
+function availabilityPanel() {
+  return (
+    '<section class="card"><h2>Share availability</h2>' +
+    button("Booking settings", "availability") +
+    (state.bookingPath
+      ? ' <a target="_blank" href="' +
+        safe(state.bookingPath) +
+        '">Open booking link</a>'
+      : "") +
+    "</section>"
+  );
+}
+document.addEventListener("click", async (e) => {
+  if (e.target.closest('[data-act="availability"]')) {
+    try {
+      const cfg = (await (await fetch("/availability")).json()).config || {};
+      dialog(
+        "Booking availability",
+        field(
+          "title",
+          "Meeting title",
+          "text",
+          cfg.title || "Working session",
+          "required",
+        ) +
+          field("location", "Location", "text", cfg.location) +
+          field(
+            "question",
+            "Guest question",
+            "text",
+            cfg.question || "What would you like to discuss?",
+          ) +
+          field(
+            "days",
+            "Available weekdays (0 Sunday – 6 Saturday)",
+            "text",
+            (cfg.days || ["1", "2", "3", "4", "5"]).join(","),
+          ) +
+          field(
+            "hour",
+            "Start hour",
+            "number",
+            cfg.hour ?? 9,
+            'min="0" max="23" required',
+          ) +
+          field(
+            "hours",
+            "Window in hours",
+            "number",
+            cfg.hours || 8,
+            'min="1" max="24" required',
+          ) +
+          field(
+            "duration",
+            "Meeting minutes",
+            "number",
+            cfg.duration || 30,
+            'min="5" max="480" required',
+          ) +
+          field(
+            "buffer",
+            "Buffer minutes",
+            "number",
+            cfg.buffer ?? 10,
+            'min="0" required',
+          ) +
+          field(
+            "notice",
+            "Minimum notice in hours",
+            "number",
+            cfg.notice ?? 24,
+            'min="0" required',
+          ),
+        async (f) => {
+          const busy = state.tasks
+            .filter((t) => !t.trashed && t.date && t.time)
+            .map((t) => {
+              const start = new Date(t.date + "T" + t.time).getTime();
+              return { start, end: start + Number(t.minutes) * 60000 };
+            });
+          for (const e of Object.values(overlays).flat())
+            busy.push({ start: Date.parse(e.start), end: Date.parse(e.end) });
+          const config = {
+            ...f,
+            days: f.days.split(",").map((v) => v.trim()),
+            hour: +f.hour,
+            hours: +f.hours,
+            duration: +f.duration,
+            buffer: +f.buffer,
+            notice: +f.notice,
+            busy,
+          };
+          const r = await fetch("/availability", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(config),
+          });
+          if (!r.ok) throw Error("Could not save availability");
+          state.bookingPath = (await r.json()).path;
+        },
+      );
+    } catch {
+      alert("Booking service unavailable.");
+    }
+  }
+});
+
+let lockPending = Promise.resolve();
+const lockCache = new Map();
+function syncBlocks() {
+  if (!state.config?.lockCalendar) return;
+  for (const t of state.tasks) {
+    const payload = {
+      id: t.id,
+      title: t.title,
+      calendar: state.config.lockCalendar,
+      private: state.config.privateBlocks,
+      remove:
+        !t.time || !t.date || t.trashed || (t.done && state.config.unlockDone),
+    };
+    if (payload.remove && !lockCache.has(t.id) && !t.locked) continue;
+    if (!payload.remove) {
+      payload.start = new Date(t.date + "T" + t.time).getTime();
+      payload.end = payload.start + Number(t.minutes) * 60000;
+    }
+    const sig = JSON.stringify(payload);
+    if (lockCache.get(t.id) === sig) continue;
+    lockCache.set(t.id, sig);
+    lockPending = lockPending
+      .then(async () => {
+        const r = await fetch("/google/lock", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: sig,
+        });
+        const b = await r.json();
+        if (!b.ok) throw Error(b.error || "Reconnect Google Calendar");
+        t.locked = !payload.remove;
+        localStorage.setItem("lifeos", JSON.stringify(state));
+        $("#syncState")?.replaceChildren("Synced");
+      })
+      .catch((err) => {
+        lockCache.delete(t.id);
+        if ($("#syncState")) $("#syncState").textContent = err.message;
+      });
+  }
+}
+document.addEventListener("click", (e) => {
+  if (e.target.closest('[data-act="lockSettings"]'))
+    dialog(
+      "Time blocking on Google",
+      field(
+        "calendar",
+        "Destination calendar ID",
+        "text",
+        state.config?.lockCalendar || "",
+      ) +
+        select(
+          "privacy",
+          "Visibility",
+          [
+            ["private", "Private"],
+            ["default", "Calendar default"],
+          ],
+          state.config?.privateBlocks ? "private" : "default",
+        ) +
+        select(
+          "unlock",
+          "On completion",
+          [
+            ["yes", "Release time"],
+            ["no", "Keep reserved"],
+          ],
+          state.config?.unlockDone ? "yes" : "no",
+        ),
+      (f) => {
+        const c = (state.config ||= {});
+        c.lockCalendar = f.calendar.trim();
+        c.privateBlocks = f.privacy === "private";
+        c.unlockDone = f.unlock === "yes";
+      },
+    );
+});
+
+let cloudRevision = 0,
+  dirty = false,
+  pushing = false,
+  conflict = false;
+function cloudNotice(message) {
+  let el = $("#cloudNotice");
+  if (!el) {
+    el = document.createElement("section");
+    el.id = "cloudNotice";
+    el.setAttribute("role", "status");
+    $("main").prepend(el);
+  }
+  el.textContent = message;
+  if (conflict) {
+    const download = document.createElement("button");
+    download.textContent = "Export this device’s edits";
+    download.onclick = () => {
+      const a = document.createElement("a");
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(state, null, 2)], {
+          type: "application/json",
+        }),
+      );
+      a.href = url;
+      a.download = "lifeos-device-edits.json";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    el.append(download);
+    const reload = document.createElement("button");
+    reload.textContent = "Use server version";
+    reload.onclick = () => {
+      if (
+        confirm("Replace this device’s pending edits with the server version?")
+      ) {
+        localStorage.removeItem("cloudPending");
+        location.reload();
+      }
+    };
+    el.append(reload);
+  }
+}
+function queueCloud() {
+  dirty = true;
+  localStorage.setItem("cloudPending", String(cloudRevision));
+  void flushCloud();
+}
+async function flushCloud() {
+  if (!dirty || pushing || conflict) return;
+  pushing = true;
+  try {
+    while (dirty) {
+      dirty = false;
+      const r = await fetch("/workspace", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ revision: cloudRevision, data: state }),
+      });
+      if (r.status === 409) {
+        conflict = true;
+        cloudNotice(
+          "Another device saved first. Your edits are kept on this device. ",
+        );
+        return;
+      }
+      if (!r.ok) throw Error("save failed");
+      cloudRevision = (await r.json()).revision;
+      if (dirty) localStorage.setItem("cloudPending", String(cloudRevision));
+      else localStorage.removeItem("cloudPending");
+      cloudNotice("Saved to your server");
+    }
+  } catch {
+    dirty = true;
+    cloudNotice(
+      "Offline or server unavailable. Your edits are saved on this device.",
+    );
+  } finally {
+    pushing = false;
+  }
+}
+async function pullCloud(initial = false) {
+  if (conflict || pushing) return;
+  if (dirty) return flushCloud();
+  if (
+    !initial &&
+    ($("#modal").open ||
+      view === "openGym" ||
+      document.activeElement?.matches("input,textarea,select"))
+  )
+    return;
+  const before = cloudRevision;
+  try {
+    const r = await fetch("/workspace", { cache: "no-store" });
+    if (!r.ok) throw Error();
+    const remote = await r.json();
+    if (dirty || pushing || before !== cloudRevision) return;
+    const pending = localStorage.getItem("cloudPending");
+    if (initial && pending !== null) {
+      cloudRevision = Number(pending);
+      if (cloudRevision !== remote.revision) {
+        conflict = true;
+        cloudNotice("Your unsent edits overlap a newer server version. ");
+        return;
+      }
+      queueCloud();
+      return;
+    }
+    if (initial || cloudRevision !== remote.revision) {
+      cloudRevision = remote.revision;
+      if (remote.data) {
+        state = { ...defaults, ...remote.data };
+        localStorage.setItem("lifeos", JSON.stringify(state));
+        render();
+      }
+      cloudNotice("Connected to your server");
+    }
+  } catch {
+    cloudNotice("Server unavailable. Showing this device’s saved workspace.");
+  }
+}
+document.addEventListener("input", (e) => {
+  if (e.target.name === "diaryFilter")
+    for (const row of document.querySelectorAll("[data-entry]"))
+      row.hidden = !row.textContent
+        .toLowerCase()
+        .includes(e.target.value.toLowerCase());
+});
+document.addEventListener("click", (e) => {
+  if (e.target.closest('[data-act="newSkill"]'))
+    dialog("New skill", field("name", "Name", "text", "", "required"), (f) => {
+      const s = f.name.trim();
+      if (s && !state.skills.includes(s)) state.skills.push(s);
+    });
+});
+async function refreshTraining() {
+  if (conflict || dirty || pushing || document.hidden) return;
+  try {
+    const response = await fetch("/gym/api/data", { cache: "no-store" });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (!Array.isArray(data.state?.workouts)) return;
+    const receipts = Object.fromEntries(
+      Object.entries(state.receipts).filter(([key]) => !key.startsWith("gym:")),
+    );
+    for (const w of data.state.workouts)
+      if (w.id)
+        receipts["gym:" + w.id] = {
+          title: w.name || "Workout",
+          date: w.d,
+          skill: "Gym",
+          xp: 25,
+          coins: 4,
+        };
+    if (JSON.stringify(receipts) !== JSON.stringify(state.receipts)) {
+      state.receipts = receipts;
+      localStorage.setItem("lifeos", JSON.stringify(state));
+      queueCloud();
+      if (view === "Overview") render();
+    }
+  } catch {}
+}
+if (window.lifeosHosted) {
+  await pullCloud(true);
+  setInterval(pullCloud, 5000);
+  void refreshTraining();
+  setInterval(refreshTraining, 30000);
+}
+render();
+setInterval(tick, 1000);
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-act]");
+  if (!b) return;
+  if (b.dataset.act === "switchTheme") $("#theme").click();
+  if (b.dataset.act === "assign") {
+    const t = state.tasks.find((t) => t.id === b.dataset.key);
+    dialog(
+      "Assign project",
+      select(
+        "project",
+        "Project",
+        [["", "Personal"], ...state.projects.map((p) => [p.id, p.name])],
+        t.project,
+      ),
+      (f) => (t.project = f.project),
+    );
+  }
 });

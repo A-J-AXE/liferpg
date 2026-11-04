@@ -14,3 +14,9 @@ The complete openGym subtree under fitness is pinned to a75b922181ed266e0e465801
 
 See CHECKLIST.md for requirement status. Marked entries are verified; unchecked entries may be partially implemented. Page 17 of the design brief is optional.
 
+
+## Desktop and personal server
+
+For a fresh checkout, run npm ci in the root as well as in fitness/api and fitness/frontend. Install the Electron binary with node node_modules/electron/install.js and launch with npm run desktop. To verify with Edge, run npm run verify. On other systems set LIFEOS_BROWSER to your Chromium executable.
+
+For DGX Spark Docker deployment, iPhone pairing, planner sync, MCP over SSH, and volume backups, follow [the personal server guide](SELFHOST.md). Run node verify-sync.mjs to check independent device sessions, restart persistence, and conflict detection on the development machine.

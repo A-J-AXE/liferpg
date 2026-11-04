@@ -1,0 +1,8 @@
+fitness
+.git
+.private
+node_modules
+screenshots
+.env
+.env.*
+
