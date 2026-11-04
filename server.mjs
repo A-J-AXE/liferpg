@@ -11,6 +11,7 @@ const files = {
   "/shadcn-license.txt": "ui/SHADCN-LICENSE.txt",
   "/components.css": "components.css",
   "/app.js": "app.js",
+  "/ui/planning.mjs": "ui/planning.mjs",
   "/style.css": "style.css",
 };
 http
