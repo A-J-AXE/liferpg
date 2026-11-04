@@ -1352,3 +1352,25 @@ main > header #timer {margin-left:auto;}
 .task-advanced summary {font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;outline-offset:3px;}
 .task-advanced[open] {display:flex;flex-direction:column;gap:8px;}
 .task-advanced label {margin:0;}
+
+
+/* Clean task-only Inbox / Project / Tasks workspace: no calendar or dashboard card. */
+#screen .hero h1 {font:600 clamp(22px,2.15vw,27px)/1.3 "Segoe UI",system-ui,sans-serif;letter-spacing:-.035em;margin:13px 0 17px;}
+.lifeos-task-page {max-width:900px;min-width:0;}
+.lifeos-task-page .project-head {display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-height:40px;padding:2px 0 13px;border-bottom:1px solid var(--line);}
+.lifeos-task-page .project-identity {display:flex;align-items:center;gap:8px;min-width:0;color:var(--muted);font-size:12px;}
+.lifeos-task-page .project-identity .thumb {width:28px;height:28px;border-radius:5px;}
+.lifeos-task-page .project-progress {flex:1;min-width:120px;height:5px;max-width:230px;border-radius:10px;background:var(--line);overflow:hidden;}
+.lifeos-task-page .project-progress > span {display:block;height:100%;background:var(--accent);border-radius:inherit;}
+.lifeos-task-page .project-head button {margin-left:auto;border:1px solid var(--line);background:transparent;padding:5px 9px;color:var(--muted);font-size:12px;}
+.lifeos-task-page .task-list-toolbar {display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px;min-height:20px;margin:10px 0 2px;}
+.lifeos-task-page .up-quick {padding:4px 6px;margin:8px 0 14px;border:1px solid var(--line);border-radius:7px;background:var(--panel);}
+.lifeos-task-page .up-quick input {font-size:13px;padding:7px 6px;}
+.lifeos-task-page .task-section-heading {display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 4px 7px;border-bottom:1px solid var(--line);font-size:12px;font-weight:600;}
+.lifeos-task-page .task-section-heading small {color:var(--muted);font-size:10px;letter-spacing:0;font-weight:400;}
+.lifeos-task-page .row[data-task] {padding:10px 4px;min-height:47px;}
+.lifeos-task-page .row[data-task] .grow > button {font-size:13px;line-height:1.4;}
+.lifeos-task-page.project .row .pill button {display:none;}
+.lifeos-task-page .task-empty {color:var(--muted);font-size:12px;padding:13px 5px;}
+.lifeos-task-page .done-group {border-top:1px solid var(--line);margin-top:18px;}
+.lifeos-task-page .done-group summary {cursor:pointer;color:var(--muted);font-size:12px;padding:11px 4px;}

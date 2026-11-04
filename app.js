@@ -686,6 +686,32 @@ function habits() {
       .join("")
   );
 }
+function taskWorkspace() {
+  const p=project(view);
+  const tasks=state.tasks.filter(t => !t.trashed && (
+    p ? t.project===p.id :
+    view==="Inbox" ? planOf(t).kind==="unscheduled" : true
+  ));
+  const open=tasks.filter(t=>!t.done),done=tasks.filter(t=>t.done);
+  const completion=tasks.length?Math.round(100*done.length/tasks.length):0;
+  const metadata=p
+    ? '<div class="project-head"><div class="project-identity">'+image(p)+
+      '<span>'+safe(p.stage||"In progress")+' · '+safe(p.skill||"")+'</span></div>'+
+      '<div class="project-progress" role="progressbar" aria-label="Project completion" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+completion+'"><span style="width:'+completion+'%"></span></div>'+
+      button("Edit project","project",p.id)+'</div>'
+    : "";
+  const quick='<form class="up-quick task-quick" data-quick-kind="unscheduled" data-quick-project="'+safe(p?.id||"")+'">'+
+    '<label class="sr-only" for="workspace-task-title">New task title</label><span aria-hidden="true">＋</span>'+
+    '<input id="workspace-task-title" name="title" placeholder="Add task…" autocomplete="off" required maxlength="300"></form>';
+  const duration=(items)=>items.reduce((sum,t)=>sum+Number(t.minutes||0),0);
+  const heading=(label,items)=>'<div class="task-section-heading"><span>'+label+'</span><small>'+items.length+' · '+duration(items)+' min</small></div>';
+  return '<section class="lifeos-task-page'+(p?' project':'')+'">'+metadata+
+    '<div class="task-list-toolbar"><span>'+tasks.length+' task'+(tasks.length===1?'':'s')+'</span>'+ (view==="Tasks"?button("New project","project"):"")+'</div>'+
+    quick+heading("To-dos",open)+
+    (open.length?open.map(row).join(""):'<p class="task-empty">No open tasks</p>')+
+    (done.length?'<details class="done-group"><summary>Completed · '+done.length+'</summary>'+heading("Done",done)+done.map(row).join("")+'</details>':"")+
+    '</section>';
+}
 function plannerQueue() {
   const pending = state.tasks.filter(t => !t.trashed && !t.done && !t.time && planOf(t).kind !== "someday");
   return '<section class="planner-queue" aria-label="Tasks to schedule"><div class="planner-queue-head"><h2>To schedule</h2><span>'+pending.length+'</span></div>' +
@@ -780,7 +806,7 @@ function render() {
           ? upcomingHTML({tasks:state.tasks,mode:upcomingMode,anchor:upcomingAnchor,today:day(),renderTask:row})
           : view === "Planner" || view === "Today" || view === "Agenda"
             ? '<div class="planner-layout">' + plannerQueue() + calendar() + '</div>'
-            : '<div class="task-workspace">' + agenda() + '</div>';
+            : '<div class="task-workspace">' + taskWorkspace() + '</div>';
   if (view === "Design system" && $("#screen lifeos-showcase")) {
     tick();
     return;
