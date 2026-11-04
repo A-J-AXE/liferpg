@@ -48,7 +48,7 @@ try {
     const entry = p.locator("#nav").getByRole("button", { name: t, exact: true });
     if (!(await entry.isVisible())) {
       const more = p.locator("#nav details.more-views");
-      if (await more.count() && !(await more.getAttribute("open")).includes?.("open")) {
+      if ((await more.count()) && !(await more.evaluate((element) => element.open))) {
         await more.locator("summary").click();
       }
     }
