@@ -105,7 +105,7 @@ try {
   const first=page.locator(".up-column").first();
   await first.locator('input[name=title]').fill("Month keyboard shift");
   await first.locator('input[name=title]').press("Enter");
-  const shifting=await first.locator(".up-draggable").last().getAttribute("data-up-task");
+  const shifting=await first.locator(".up-draggable").filter({hasText:"Month keyboard shift"}).getAttribute("data-up-task");
   await first.locator('.up-draggable[data-up-task="'+shifting+'"]').focus();
   await first.locator('.up-draggable[data-up-task="'+shifting+'"]').press("Alt+ArrowRight");
   const shifted=await page.evaluate(id=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.id===id),shifting);
