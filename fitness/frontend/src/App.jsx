@@ -127,6 +127,11 @@ function Shell() {
   const loc = useLocation()
   const navType = useNavigationType()
   const { S, user, ready } = useStore()
+  useEffect(() => {
+    if (!ready || window.parent === window) return
+    const sessions = (S.workouts || []).filter(w => w.id).map(w => ({id:String(w.id), name:w.name || 'Workout', date:w.d}))
+    window.parent.postMessage({type:'lifeos-sessions', sessions}, 'http://127.0.0.1:4310')
+  }, [ready, S.workouts])
   // iOS: whether timer sounds get past the ring/silent switch (Settings → Sounds). Page-level,
   // so it is applied here on load and on change rather than at each beep.
   useEffect(() => { setPlayOnSilent(!!S.soundOnSilent) }, [S.soundOnSilent])

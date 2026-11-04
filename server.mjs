@@ -1,8 +1,10 @@
 import http from 'node:http';
+import {calendarAPI} from './google.mjs';
 import {readFile} from 'node:fs/promises';
 const files={'/':'index.html','/app.js':'app.js','/style.css':'style.css'};
 http.createServer(async(req,res)=>{
  const name=files[new URL(req.url,'http://localhost').pathname];
+ if(req.url.startsWith('/google/'))return calendarAPI(req,res,new URL(req.url,'http://localhost'));
  if(!name){res.writeHead(404).end();return;}
  try {const data=await readFile(new URL(name,import.meta.url));res.setHeader('Content-Type',name.endsWith('js')?'text/javascript':name.endsWith('css')?'text/css':'text/html');res.end(data);}catch{res.writeHead(500).end();}
 }).listen(4310,'127.0.0.1',()=>console.log('LifeOS: http://127.0.0.1:4310'));
