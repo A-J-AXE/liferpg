@@ -29,10 +29,10 @@ jobs:
         run: npm run typecheck
       - name: Compile shadcn/React frontend
         run: npm run build:ui
-      - name: Existing workspace integration
-        run: LIFEOS_BROWSER=/usr/bin/google-chrome node verify-workspace-ui.mjs
       - name: New design-system interactions and screenshots
         run: LIFEOS_BROWSER=/usr/bin/google-chrome node verify-design-system.mjs
+      - name: Existing workspace integration
+        run: LIFEOS_BROWSER=/usr/bin/google-chrome node verify-workspace-ui.mjs
       - name: Upload screenshot evidence
         uses: actions/upload-artifact@v4
         if: always()
