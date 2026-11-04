@@ -52,7 +52,15 @@ try {
   await month.locator("input[name=title]").press("Enter");
   const planned=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.title==="Month smoke test"));
   assert.equal(planned.planning.kind,"month");assert.equal(planned.date,"");assert.equal(planned.time,"");
-  await month.locator(".row[data-task]").filter({hasText:"Month smoke test"}).dragTo(p.locator('.up-column[data-plan-kind="someday"]'));
+  // Exercise a real nearby board drag; off-screen buckets also have a keyboard-accessible planning menu.
+  const todayColumn=p.locator('.up-column').filter({has:p.getByRole("heading",{name:"Today",exact:true})});
+  await todayColumn.locator('input[name=title]').fill("Adjacent board drag test");
+  await todayColumn.locator('input[name=title]').press("Enter");
+  await todayColumn.locator(".row[data-task]").filter({hasText:"Adjacent board drag test"})
+    .dragTo(p.locator('.up-column').filter({has:p.getByRole("heading",{name:"This Week",exact:true})}));
+  const movedWeek=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.title==="Adjacent board drag test"));
+  assert.equal(movedWeek.planning.kind,"week");
+  await month.locator(".row[data-task]").filter({hasText:"Month smoke test"}).locator("select.mini-plan").selectOption("someday");
   const movedToSomeday=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.title==="Month smoke test"));
   assert.equal(movedToSomeday.planning.kind,"someday");
   await p.screenshot({path:"workspace-screenshots/upcoming-overview.png"});
