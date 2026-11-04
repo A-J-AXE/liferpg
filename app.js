@@ -1038,7 +1038,28 @@ function tick() {
     Math.floor(left / 60) +
     ":" +
     String(left % 60).padStart(2, "0");
+  const control = $("#timer-toggle");
+  if (control) {
+    const running = !!t.end && left > 0;
+    control.textContent = running ? "Ⅱ" : "▶";
+    control.setAttribute("aria-label", running ? "Pause focus timer" : "Start focus timer");
+    control.title = running ? "Pause timer" : "Start or resume timer";
+  }
 }
+$("#timer-toggle").onclick = () => {
+  const timer=state.timer;
+  const remaining=timer.end ? Math.max(0,Math.ceil((timer.end-Date.now())/1000)) : Number(timer.left);
+  if (timer.end) {
+    timer.left=remaining;
+    timer.end=null;
+  } else {
+    const duration=Number(state.config?.durations?.[timer.mode])*60 ||
+      {Focus:1500,Break:300,"Long break":900}[timer.mode] || 1500;
+    timer.left=remaining>0?remaining:duration;
+    timer.end=Date.now()+timer.left*1000;
+  }
+  save();
+};
 $("#timer").onclick = () => {
   let t = state.timer;
   dialog(

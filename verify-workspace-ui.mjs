@@ -14,6 +14,13 @@ try {
   const errors=[];p.on("pageerror",e=>errors.push(e.message));
   const nav=name=>p.locator("#nav").getByRole("button",{name,exact:true}).click();
   await p.goto("http://127.0.0.1:4310");
+  await p.locator("#timer-toggle").click();
+  const active=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).timer);
+  assert(active.end && active.end>Date.now());
+  await p.locator("#timer-toggle").click();
+  const paused=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).timer);
+  assert.equal(paused.end,null);
+  assert(paused.left>0);
   await p.locator(".planner-layout .time-board").waitFor();
   await p.locator("#range").selectOption("3 days");
   assert.equal(await p.locator(".time-board .day-column").count(),3);

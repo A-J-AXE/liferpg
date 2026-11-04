@@ -1385,3 +1385,12 @@ main > header #timer {margin-left:auto;}
 .time-block .resize-grip:focus-visible {outline:2px solid var(--accent);outline-offset:1px;}
 .time-block .block-title {flex:1;min-width:0;}
 .time-block .block-time {flex:none;}
+
+/* One-click persistent Pomodoro: compact icon-led controls. */
+main > header .focus-pill {margin-left:auto;display:inline-flex;align-items:center;gap:0;
+  border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden;min-height:32px;}
+main > header .focus-pill button {margin:0;border:0;border-radius:0;background:transparent;min-height:30px;}
+main > header .focus-pill #timer-toggle {width:34px;min-width:34px;padding:3px 7px;border-right:1px solid var(--line);color:var(--accent);font-size:15px;}
+main > header .focus-pill #timer {font-size:12px;font-weight:600;padding:4px 10px;font-variant-numeric:tabular-nums;}
+main > header .focus-pill button:hover {background:var(--tint);}
+main > header .focus-pill button:focus-visible {outline:2px solid var(--accent);outline-offset:-2px;}
