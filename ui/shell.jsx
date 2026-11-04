@@ -47,6 +47,8 @@ const groups = [
     [
       [PanelsTopLeft, "Overview"],
       [Inbox, "Inbox"],
+      [CalendarDays, "Planner"],
+      [ListChecks, "Upcoming"],
       [CalendarDays, "Today"],
       [ListChecks, "Tasks"],
       [Folders, "Projects"],

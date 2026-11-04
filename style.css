@@ -1281,3 +1281,50 @@ task-date-picker {
   color: var(--muted);
   letter-spacing: 0;
 }
+
+
+/* Task-first workspaces: only Planner mounts the hourly calendar. */
+.sr-only { position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
+#screen:has(.upcoming-workspace),#screen:has(.planner-layout) { min-width:0; }
+#screen:has(.upcoming-workspace) .hero h1,#screen:has(.planner-layout) .hero h1 { font:600 23px/1.3 "Segoe UI",system-ui,sans-serif;margin:12px 0 16px;letter-spacing:-.035em; }
+.upcoming-workspace,.planner-layout,.task-workspace { min-width:0; }
+.up-toolbar { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 0 12px;border-bottom:1px solid var(--line); }
+.up-tabs,.up-navigation { display:flex;align-items:center;gap:3px; }
+.up-tabs button,.up-navigation button { border:1px solid transparent;background:transparent;padding:6px 11px;border-radius:6px;font-size:12px;min-height:32px; }
+.up-tabs button.selected { color:var(--ink);background:var(--tint);border-color:var(--line);font-weight:600; }
+.up-tabs button:not(.selected) { color:var(--muted); }
+.up-tabs button:focus-visible,.up-navigation button:focus-visible,.up-quick input:focus-visible { outline:2px solid var(--accent);outline-offset:2px; }
+.up-scroller { overflow-x:auto;overflow-y:visible;scrollbar-width:thin;max-width:100%; }
+.up-board { display:grid;grid-auto-flow:column;grid-auto-columns:minmax(246px,270px);align-items:stretch;min-height:60vh; }
+.up-column { min-width:0;border-right:1px solid var(--line);padding:14px 12px 28px;transition:background .12s; }
+.up-column:first-child { border-left:1px solid var(--line); }
+.up-column:has(.up-quick:focus-within) { background:color-mix(in srgb,var(--tint) 20%,transparent); }
+.up-column-head { padding:0 0 12px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:flex-start;justify-content:space-between; }
+.up-column-head h2 { font:600 13px/1.4 "Segoe UI",system-ui,sans-serif;margin:0 0 2px;letter-spacing:0; }
+.up-column-head small { letter-spacing:0;color:var(--muted);font-size:11px; }
+.up-count { font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums; }
+.up-quick { position:relative;display:flex;align-items:center;gap:5px;margin:10px 0 8px;min-width:0; }
+.up-quick > span { color:var(--muted);font-size:18px;line-height:1; }
+.up-quick input { border:none;background:transparent;border-radius:4px;min-width:0;flex:1;font-size:12px;padding:5px 6px;box-shadow:none; }
+.up-quick input::placeholder { color:var(--muted);opacity:.82; }
+.up-task-list .row[data-task],.planner-queue .row[data-task],.task-workspace .row[data-task] { border-bottom:1px solid color-mix(in srgb,var(--line) 75%,transparent);padding:7px 3px;align-items:flex-start;gap:8px;min-width:0; }
+.up-task-list .row[data-task] .grow > button,.planner-queue .row[data-task] .grow > button,.task-workspace .row[data-task] .grow > button { text-overflow:ellipsis;white-space:normal;overflow-wrap:anywhere;text-align:left;font-size:12px;padding:0; }
+.up-task-list .row[data-task] .pill,.planner-queue .row[data-task] .pill { font-size:10px;letter-spacing:0;gap:3px; }
+.up-task-list .row[data-task] input[type="checkbox"],.planner-queue .row[data-task] input[type="checkbox"] { margin-top:3px; }
+.up-done-label { text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-size:10px;margin:14px 0 5px; }
+.planner-layout { display:grid;grid-template-columns:minmax(215px,285px) minmax(0,1fr);gap:14px;align-items:start; }
+.planner-queue { min-width:0;padding:10px 8px;background:var(--panel);border:1px solid var(--line);border-radius:8px; }
+.planner-queue-head { display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 3px 8px;border-bottom:1px solid var(--line); }
+.planner-queue-head h2 { font:600 13px "Segoe UI",system-ui,sans-serif;letter-spacing:0;margin:0; }
+.planner-queue-head span { color:var(--muted);font-size:11px; }
+.planner-queue-items { max-height:65vh;overflow-y:auto;scrollbar-width:thin; }
+.planner-layout .calendar-card { margin:0;padding:10px;border-radius:8px; }
+.planner-layout .calendar-head { gap:6px;margin-bottom:10px;flex-wrap:wrap; }
+.planner-layout .calendar-head h2 { font:600 13px "Segoe UI",system-ui,sans-serif; }
+.planner-layout .time-board { grid-template-columns:43px repeat(var(--days),minmax(128px,1fr)); }
+.task-workspace { max-width:960px; }
+.task-workspace .card { margin:0;padding:14px;border-radius:8px; }
+.task-workspace .card h2 { font:600 16px "Segoe UI",system-ui,sans-serif;margin:0; }
+.lifeos-overview .agenda-stack { min-width:0; }
+@media (max-width:1000px) { .planner-layout { grid-template-columns:minmax(185px,230px) minmax(0,1fr);gap:8px; } }
+@media (max-width:760px) { .planner-layout { display:flex;flex-direction:column; } .planner-queue,.planner-layout .calendar-card { width:100%; } .planner-queue-items { max-height:220px; } .up-toolbar { flex-wrap:wrap; } .up-board { grid-auto-columns:minmax(235px,270px); } }
