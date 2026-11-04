@@ -40,3 +40,8 @@ Validation: `npm run typecheck`, `npm run build:ui`, `node verify-planning.mjs`,
 ### Advanced Planner (stacked PR #3)
 
 The Planner time grid has 24 local hours and 15-minute snapping, overlapping event lanes, 1–7 visible days, persisted zoom, direct drag/keyboard scheduling, pointer/keyboard duration resizing and session-scoped undo/redo. Task-only Upcoming remains independent. Implementation: `ui/planner-engine.mjs`, `app.js`, `docs/advanced-planner.md`. Validation: `node verify-planner-engine.mjs` and `LIFEOS_BROWSER=/usr/bin/google-chrome node verify-planner-ui.mjs` after `npm run build:ui`.
+
+
+### Upcoming task boards — stacked PR #4
+
+Upcoming is task-only: Overview, Day, Week and Month. Each view provides manual / priority / name / duration sorting, per-period quick-add, task drag ordering and Alt+arrow keyboard movement. One task record preserves its project and receipts. Week/month assignments never invent exact time. See docs/upcoming-boards.md and verify-upcoming-ui.mjs.
