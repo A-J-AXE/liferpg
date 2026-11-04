@@ -1,5 +1,6 @@
 import { searchTasks, renderSidebar } from "/shell.js";
 import { addDays, addMonths, planOf, applyPlan, upcomingHTML } from "./ui/planning.mjs";
+import { PLANNER_HOURS, minutesOf, clockOf, clampDuration, timeFromPointer, scheduleAt, moveTaskBy, resizeTaskBy, snapshot, restore, layoutEvents } from "./ui/planner-engine.mjs";
 const $ = (s) => document.querySelector(s);
 const safe = (v) =>
   String(v ?? "").replace(
@@ -41,6 +42,9 @@ let view =
   range = "Day",
   upcomingMode = "Overview",
   upcomingAnchor = now;
+let plannerZoom = [40,56,72].includes(Number(state.planner?.hourHeight)) ? Number(state.planner.hourHeight) : 56;
+let plannerScrollTop = null, plannerScrollLeft = 0, plannerNotice = "";
+const plannerUndoStack = [], plannerRedoStack = [];
 const project = (k) => state.projects.find((p) => p.id === k);
 const image = (p) =>
   p?.image ? '<img class="thumb" alt="" src="' + safe(p.image) + '">' : "";
@@ -61,6 +65,28 @@ function save() {
     state = JSON.parse(localStorage.getItem("lifeos")) || defaults;
   }
   render();
+}
+// Reversible schedule operations modify only the task time/precision/duration fields.
+function plannerTransaction(task, action, label) {
+  const before = snapshot(task);
+  action();
+  const after = snapshot(task);
+  if (JSON.stringify(before) === JSON.stringify(after)) return;
+  plannerUndoStack.push({ id: task.id, before, after });
+  if (plannerUndoStack.length > 60) plannerUndoStack.shift();
+  plannerRedoStack.length = 0;
+  plannerNotice = label;
+  save();
+}
+function plannerRestore(source, destination, label) {
+  const entry = source.pop();
+  if (!entry) return;
+  const task = state.tasks.find(t => t.id === entry.id);
+  if (!task) { plannerNotice = "Task no longer exists"; render(); return; }
+  restore(task, source === plannerUndoStack ? entry.before : entry.after);
+  destination.push(entry);
+  plannerNotice = label;
+  save();
 }
 function button(t, a, k = "", extra = "") {
   return (
@@ -416,157 +442,80 @@ function shift(n) {
 }
 // Local calendar coordinates: minutes since midnight; one shared scale across days.
 function calendar() {
-  const first = new Date(date + "T12:00"),
-    month = range === "Month",
-    count = month
-      ? new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
-      : range === "Week"
-        ? 7
-        : parseInt(range) || 1;
+  const first = new Date(date + "T12:00"), month = range === "Month";
+  const count = month ? new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
+    : range === "Week" ? 7 : parseInt(range, 10) || 1;
   if (month) first.setDate(1);
-  const days = Array.from({ length: count }, (_, i) => {
-    const d = new Date(first);
-    d.setDate(d.getDate() + i);
-    return {
-      d,
-      key: day(d),
-      tasks: state.tasks
-        .filter((t) => !t.trashed && t.date === day(d) && t.time)
-        .sort((a, b) => a.time.localeCompare(b.time)),
-    };
+  const days = Array.from({length:count},(_,i)=>{
+    const d = new Date(first);d.setDate(d.getDate()+i);
+    const key=day(d);
+    return {d,key,tasks:state.tasks.filter(t=>!t.trashed&&t.date===key&&minutesOf(t.time)!==null)};
   });
-  const mins = (t) =>
-    Number(t.time.slice(0, 2)) * 60 + Number(t.time.slice(3, 5));
-  const all = days.flatMap((d) => d.tasks);
-  const start = Math.min(8, ...all.map((t) => Math.floor(mins(t) / 60))),
-    end = Math.min(
-      24,
-      Math.max(
-        19,
-        ...all.map((t) => Math.ceil((mins(t) + Number(t.minutes)) / 60)),
-      ),
-    );
-  const hours = Array.from({ length: end - start }, (_, i) => start + i);
-  const time = (n) =>
-    String(Math.floor(n / 60)).padStart(2, "0") +
-    ":" +
-    String(n % 60).padStart(2, "0");
-  function block(t, pos = "") {
-    const p=project(t.project),
-      color=/^#[0-9a-f]{6}$/i.test(p?.color)?p.color:"var(--accent)";
-    const name=t.time+" · "+t.title+" · "+t.minutes+" min"+(p?" · "+p.name:"");
+  const todayKey=day(new Date()), nowDate=new Date(), minuteNow=nowDate.getHours()*60+nowDate.getMinutes();
+  const time=(n)=>String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0");
+  function block(t,pos="") {
+    const p=project(t.project), color=/^#[0-9a-f]{6}$/i.test(p?.color)?p.color:"var(--accent)";
+    const name=t.title+" · "+t.time+" · "+t.minutes+" min"+(p?" · "+p.name:"");
     const content='<span class="block-title">'+image(p)+safe(t.title)+'</span>'+
       '<span class="block-time">'+safe(t.time)+' · '+Number(t.minutes)+'m</span>';
-    return '<div class="time-block" draggable="true" data-task="'+safe(t.id)+'" style="--project:'+color+';'+pos+'">'+
-      button(content,"edit",t.id,'class="time-block-main" aria-label="'+safe(name)+'" title="'+safe(name)+'"')+
-      (pos?'<span class="resize-grip" data-resize="'+safe(t.id)+'" role="slider" tabindex="0" aria-label="Resize '+safe(t.title)+'" aria-valuemin="15" aria-valuemax="1440" aria-valuenow="'+Number(t.minutes)+'"></span>':"")+
+    return '<div class="time-block" tabindex="0" role="group" aria-label="'+safe("Scheduled "+name)+
+      '. Arrow keys move 15 minutes or one day." draggable="true" data-task="'+safe(t.id)+
+      '" style="--project:'+color+';'+pos+'">'+
+      button(content,"edit",t.id,'class="time-block-main" aria-label="'+safe("Edit "+name)+'" title="'+safe(name)+'"')+
+      (pos?button("×","plannerUnplan",t.id,'class="planner-block-unplan" aria-label="'+safe("Unschedule "+t.title)+'" title="Unschedule"')+
+      '<span class="resize-grip" data-resize="'+safe(t.id)+'" role="slider" tabindex="0" aria-label="'+safe("Resize "+t.title)+
+      '" aria-valuemin="15" aria-valuemax="'+(1440-minutesOf(t.time))+'" aria-valuenow="'+Number(t.minutes)+'"></span>':"")+
       '</div>';
   }
-  // Give simultaneous events their own lanes until the overlap group clears.
   function timed(tasks) {
-    let result = "",
-      group = [],
-      ends = [];
-    const flush = () => {
-      const width = 100 / ends.length;
-      for (const { t, lane, at, duration } of group)
-        result += block(
-          t,
-          "top:calc(" +
-            (at - start * 60) / 60 +
-            " * var(--hour));height:calc(" +
-            duration / 60 +
-            " * var(--hour));left:calc(" +
-            lane * width +
-            "% + 2px);width:calc(" +
-            width +
-            "% - 4px)",
-        );
-      group = [];
-      ends = [];
-    };
-    for (const t of tasks) {
-      const at = mins(t),
-        duration = Math.min(1440 - at, Math.max(1, Number(t.minutes) || 30));
-      if (ends.length && Math.max(...ends) <= at) flush();
-      let lane = ends.findIndex((x) => x <= at);
-      if (lane < 0) lane = ends.length;
-      ends[lane] = at + duration;
-      group.push({ t, lane, at, duration });
-    }
-    if (group.length) flush();
-    return result;
+    return layoutEvents(tasks).map(({task,top,height,left,width})=>block(task,
+      "top:calc("+top+" * var(--hour));height:calc("+height+" * var(--hour));"+
+      "left:calc("+left+"% + 2px);width:calc("+width+"% - 4px);")).join("");
   }
-  const grid = month
-    ? '<div class="calendar-scroll"><div class="month-board">' +
-      ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        .map((x) => "<b>" + x + "</b>")
-        .join("") +
-      days
-        .map(
-          ({ d, key, tasks }, i) =>
-            '<div class="slot month-day" data-date="' +
-            key +
-            '" style="' +
-            (!i ? "grid-column:" + (((d.getDay() + 6) % 7) + 1) : "") +
-            '"><strong>' +
-            d.getDate() +
-            "</strong>" +
-            tasks.map((t) => block(t)).join("") +
-            "</div>",
-        )
-        .join("") +
+  const grid=month
+    ? '<div class="calendar-scroll" aria-label="Monthly calendar"><div class="month-board">'+
+      ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(x=>"<b>"+x+"</b>").join("")+
+      days.map(({d,key,tasks},i)=>'<div class="slot month-day" data-date="'+key+
+        '" style="'+(!i?"grid-column:"+(((d.getDay()+6)%7)+1):"")+'"><strong>'+d.getDate()+
+        '</strong>'+tasks.map(t=>block(t)).join("")+"</div>").join("")+
       "</div></div>"
-    : '<div class="calendar-scroll"><div class="time-board" style="--days:' +
-      count +
-      '"><div class="time-axis"><div class="date-cap">Local</div>' +
-      hours.map((h) => "<time>" + time(h * 60) + "</time>").join("") +
-      "</div>" +
-      days
-        .map(
-          ({ key, d, tasks }) =>
-            '<div><div class="date-cap">' +
-            safe(
-              d.toLocaleDateString(undefined, {
-                weekday: "short",
-                day: "numeric",
-              }),
-            ) +
-            '</div><div class="day-column">' +
-            hours
-              .map(
-                (h) =>
-                  '<div class="slot hour" data-hour="' +
-                  h +
-                  '" data-date="' +
-                  key +
-                  '"></div>',
-              )
-              .join("") +
-            '<div class="event-layer">' +
-            timed(tasks) +
-            "</div></div></div>",
-        )
-        .join("") +
-      "</div></div>";
-  return (
-    '<section class="card calendar-card"><div class="bar calendar-head"><h2>Calendar</h2>' +
-    button("‹", "prev") +
-    button("Today", "reset") +
-    button("›", "next") +
-    '<select aria-label="Calendar range" id="range">' +
-    ["Day", "2 days", "3 days", "4 days", "5 days", "6 days", "7 days", "Week", "Month"]
-      .map(
-        (v) =>
-          "<option " + (range === v ? "selected" : "") + ">" + v + "</option>",
-      )
-      .join("") +
-    "</select></div>" +
-    googleAgenda() +
-    grid +
-    "</section>"
-  );
+    : '<div class="calendar-scroll" aria-label="Hourly planner, scroll to see all 24 hours">'+
+      '<div class="time-board" style="--days:'+count+';--hour:'+plannerZoom+'px">'+
+      '<div class="time-axis"><div class="date-cap">Local</div>'+
+      PLANNER_HOURS.map(h=>"<time>"+time(h*60)+"</time>").join("")+"</div>"+
+      days.map(({key,d,tasks})=>{
+        const isToday=key===todayKey;
+        return '<div class="time-day" data-day="'+key+'"><div class="date-cap '+(isToday?"is-today":"")+'">'+
+          safe(d.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"}))+"</div>"+
+          '<div class="day-column" data-date="'+key+'">'+
+          PLANNER_HOURS.map(h=>'<div class="slot hour" data-hour="'+h+'" data-date="'+key+
+            '" aria-label="'+safe(key+" "+time(h*60))+'"></div>').join("")+
+          '<div class="event-layer">'+timed(tasks)+
+          (isToday?'<div class="planner-now-line" aria-label="Current time" style="top:calc('+(minuteNow/60)+
+          ' * var(--hour))"><span></span></div>':"")+"</div></div></div>";
+      }).join("")+"</div></div>";
+  const label=date===todayKey?"Today":new Date(date+"T12:00").toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});
+  return '<section class="card calendar-card" aria-label="Planner time blocking">'+
+    '<div class="bar calendar-head"><div class="planner-toolbar-start">'+
+      '<strong class="planner-toolbar-title">Time blocks</strong>'+
+      button("‹","prev","","class=planner-nav aria-label=Previous date range")+
+      button("Today","reset","","class=planner-today")+
+      button("›","next","","class=planner-nav aria-label=Next date range")+
+      '<label class="planner-date-label"><span class="sr-only">Planner date</span><input type="date" id="planner-date" aria-label="Planner date" value="'+safe(date)+'" title="'+safe(label)+'"></label></div>'+
+    '<div class="planner-toolbar-end">'+
+      '<label class="sr-only" for="range">Visible calendar days</label>'+
+      '<select aria-label="Calendar range" id="range">'+
+      ["Day","2 days","3 days","4 days","5 days","6 days","7 days","Week","Month"]
+        .map(v=>'<option '+(range===v?"selected":"")+'>'+v+"</option>").join("")+"</select>"+
+      (month?"":'<label class="planner-zoom-label"><span class="sr-only">Time scale</span>'+
+        '<select id="planner-zoom" aria-label="Time scale">'+
+        [[40,"Compact"],[56,"Normal"],[72,"Large"]].map(([v,n])=>'<option value="'+v+'" '+(plannerZoom===v?"selected":"")+">"+n+"</option>").join("")+"</select></label>")+
+      button("Undo","plannerUndo","","class=planner-undo "+(plannerUndoStack.length?"":"disabled")+" aria-label=Undo-planner-change")+
+      button("Redo","plannerRedo","","class=planner-redo "+(plannerRedoStack.length?"":"disabled")+" aria-label=Redo-planner-change")+
+    '</div></div><div class="planner-status" role="status" aria-live="polite">'+safe(plannerNotice)+'</div>'+
+    googleAgenda()+grid+"</section>";
 }
+
 function meter(label, xp, limit) {
   const value = xp % limit;
   return (
@@ -789,6 +738,11 @@ function render() {
     tick();
     return;
   }
+  const oldPlannerScroll = $("#screen .calendar-scroll");
+  if (oldPlannerScroll) {
+    plannerScrollTop = oldPlannerScroll.scrollTop;
+    plannerScrollLeft = oldPlannerScroll.scrollLeft;
+  }
   $("#screen").innerHTML =
     '<div class="hero"><small>' +
     new Date(date + "T12:00")
@@ -802,6 +756,11 @@ function render() {
     safe(project(view)?.name || view) +
     "</h1></div>" +
     body;
+  const nextPlannerScroll = $("#screen .calendar-scroll");
+  if (nextPlannerScroll && !nextPlannerScroll.querySelector(".month-board")) {
+    nextPlannerScroll.scrollTop = plannerScrollTop === null ? 7 * plannerZoom : plannerScrollTop;
+    nextPlannerScroll.scrollLeft = plannerScrollLeft;
+  }
   tick();
 }
 document.addEventListener("click", (e) => {
@@ -847,6 +806,15 @@ document.addEventListener("click", (e) => {
     case "sub":
       t.children[b.dataset.i].done = b.checked;
       save();
+      break;
+    case "plannerUnplan":
+      if (t) plannerTransaction(t,()=>applyPlan(t,"unscheduled"),"Task returned to To schedule");
+      break;
+    case "plannerUndo":
+      plannerRestore(plannerUndoStack,plannerRedoStack,"Planner change undone");
+      break;
+    case "plannerRedo":
+      plannerRestore(plannerRedoStack,plannerUndoStack,"Planner change restored");
       break;
     case "reset":
       view = "Planner";
@@ -916,6 +884,18 @@ document.addEventListener("click", (e) => {
   }
 });
 document.addEventListener("change", (e) => {
+  if (e.target.id === "planner-date") {
+    if (e.target.value) {date=e.target.value;plannerScrollLeft=0;render();}
+  }
+  if (e.target.id === "planner-zoom") {
+    const zoom = Number(e.target.value);
+    if ([40,56,72].includes(zoom)) {
+      plannerScrollTop = Math.round((plannerScrollTop??7*plannerZoom)/plannerZoom*zoom);
+      plannerZoom=zoom;
+      state.planner={...state.planner,hourHeight:zoom};
+      save();
+    }
+  }
   if (e.target.id === "range") {
     range = e.target.value;
     render();
@@ -948,79 +928,126 @@ document.addEventListener("submit", e => {
   applyPlan(task,f.dataset.quickKind||"unscheduled",f.dataset.quickValue||"");
   state.tasks.push(task);save();
 });
-// Resize calendar blocks in 15-minute steps. Keyboard arrows are equivalent.
-let resizing=null;
-const minutesAfterResize=(start,dy,scale)=>Math.max(15,Math.min(1440-start.at,
-  Math.round((start.minutes+dy/scale*60)/15)*15));
-document.addEventListener("pointerdown",e=>{
-  const handle=e.target.closest("[data-resize]");
-  if(!handle)return;
-  const t=state.tasks.find(t=>t.id===handle.dataset.resize);
-  if(!t)return;
-  const board=handle.closest(".time-board");
-  const hour=parseFloat(getComputedStyle(board).getPropertyValue("--hour"))||48;
-  const at=Number(t.time.slice(0,2))*60+Number(t.time.slice(3,5));
-  resizing={id:t.id,at,minutes:Number(t.minutes)||30,y:e.clientY,pointer:e.pointerId,
-    scale:hour,block:handle.closest(".time-block")};
-  handle.setPointerCapture?.(e.pointerId);
-  e.preventDefault();
-  e.stopPropagation();
+// Pointer resize, keyboard move/resize and 15-minute drag/drop all share one engine.
+let resizing=null, draggingTaskId=null;
+document.addEventListener("pointerdown",event=>{
+  const grip=event.target.closest("[data-resize]");
+  if(!grip)return;
+  const task=state.tasks.find(t=>t.id===grip.dataset.resize);
+  if(!task)return;
+  const board=grip.closest(".time-board");
+  const scale=parseFloat(getComputedStyle(board).getPropertyValue("--hour"))||plannerZoom;
+  resizing={id:task.id,before:snapshot(task),start:minutesOf(task.time),
+    minutes:Number(task.minutes)||30,atY:event.clientY,scale,pointerId:event.pointerId,
+    block:grip.closest(".time-block")};
+  grip.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
+  event.stopPropagation();
 });
-document.addEventListener("pointermove",e=>{
-  if(!resizing||e.pointerId!==resizing.pointer)return;
-  const mins=minutesAfterResize(resizing,e.clientY-resizing.y,resizing.scale);
-  resizing.block.style.height="calc("+mins/60+" * var(--hour))";
-  e.preventDefault();
+document.addEventListener("pointermove",event=>{
+  if(!resizing||event.pointerId!==resizing.pointerId)return;
+  const delta=Math.round((event.clientY-resizing.atY)/resizing.scale*60/15)*15;
+  const newMinutes=clampDuration(clockOf(resizing.start),resizing.minutes+delta);
+  resizing.block.style.height="calc("+(newMinutes/60)+" * var(--hour))";
+  event.preventDefault();
 });
-document.addEventListener("pointerup",e=>{
-  if(!resizing||e.pointerId!==resizing.pointer)return;
-  const task=state.tasks.find(t=>t.id===resizing.id);
-  if(task){task.minutes=String(minutesAfterResize(resizing,e.clientY-resizing.y,resizing.scale));save();}
+document.addEventListener("pointerup",event=>{
+  if(!resizing||event.pointerId!==resizing.pointerId)return;
+  const info=resizing;
   resizing=null;
+  const task=state.tasks.find(t=>t.id===info.id);
+  if(!task)return;
+  const delta=Math.round((event.clientY-info.atY)/info.scale*60/15)*15;
+  plannerTransaction(task,()=>resizeTaskBy(task,clampDuration(task.time,info.minutes+delta)-Number(task.minutes)),
+    "Duration changed to "+clampDuration(task.time,info.minutes+delta)+" minutes");
 });
 document.addEventListener("pointercancel",()=>{
   if(resizing){resizing=null;render();}
 });
-document.addEventListener("keydown",e=>{
-  const grip=e.target.closest("[data-resize]");
-  if(!grip||!["ArrowUp","ArrowDown"].includes(e.key))return;
-  const t=state.tasks.find(t=>t.id===grip.dataset.resize);
-  if(!t)return;
-  e.preventDefault();
-  const at=Number(t.time.slice(0,2))*60+Number(t.time.slice(3,5));
-  t.minutes=String(Math.max(15,Math.min(1440-at,Number(t.minutes)+(e.key==="ArrowDown"?15:-15))));
-  save();
-});
-document.addEventListener("dragstart", (e) => {
-  if (e.target.closest("[data-resize]")) {e.preventDefault();return;}
-  let r = e.target.closest("[data-task]");
-  if (r) e.dataTransfer.setData("text/plain", r.dataset.task);
-});
-document.addEventListener("dragover", (e) => {
-  if (e.target.closest(".slot, .up-column")) e.preventDefault();
-});
-document.addEventListener("drop", (e) => {
-  const col = e.target.closest(".up-column");
-  if (col) {
-    e.preventDefault();
-    const moving = state.tasks.find(t=>t.id === e.dataTransfer.getData("text/plain"));
-    if (moving) {applyPlan(moving,col.dataset.planKind,col.dataset.planValue);save();}
+document.addEventListener("keydown",event=>{
+  const grip=event.target.closest("[data-resize]");
+  if(grip&&["ArrowUp","ArrowDown"].includes(event.key)){
+    const task=state.tasks.find(t=>t.id===grip.dataset.resize);
+    if(!task)return;
+    event.preventDefault();
+    const step=event.key==="ArrowDown"?15:-15;
+    plannerTransaction(task,()=>resizeTaskBy(task,step),"Duration changed to "+clampDuration(task.time,Number(task.minutes)+step)+" minutes");
+    $("#screen [data-resize='"+task.id+"']")?.focus();
     return;
   }
-  let slot = e.target.closest(".slot");
-  if (!slot) return;
-  e.preventDefault();
-  let t = state.tasks.find(
-    (t) => t.id === e.dataTransfer.getData("text/plain"),
-  );
-  if (t) {
-    t.date = slot.dataset.date;
-    t.time = slot.dataset.hour
-      ? slot.dataset.hour.padStart(2, "0") + ":00"
-      : t.time || "09:00";
-    applyPlan(t, "exact-time", t.date, t.time);
-    save();
+  if (view==="Planner"||view==="Today"||view==="Agenda") {
+    const editable=event.target.closest("input,textarea,select,[contenteditable],dialog");
+    if (!editable && (event.ctrlKey||event.metaKey) && event.key.toLowerCase()==="z"){
+      event.preventDefault();
+      if(event.shiftKey)plannerRestore(plannerRedoStack,plannerUndoStack,"Planner change restored");
+      else plannerRestore(plannerUndoStack,plannerRedoStack,"Planner change undone");
+      return;
+    }
+    const block=event.target.closest(".time-block[data-task]");
+    if(block&&!grip&&["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(event.key)&&!event.ctrlKey&&!event.metaKey){
+      const task=state.tasks.find(t=>t.id===block.dataset.task);
+      if(!task)return;
+      event.preventDefault();
+      const dayDelta=event.key==="ArrowLeft"?-1:event.key==="ArrowRight"?1:0;
+      const minuteDelta=event.key==="ArrowUp"?-15:event.key==="ArrowDown"?15:0;
+      plannerTransaction(task,()=>moveTaskBy(task,dayDelta,minuteDelta),
+        "Moved "+task.title+(dayDelta?" one day":" 15 minutes"));
+      $("#screen .time-block[data-task='"+task.id+"']")?.focus();
+    }
   }
+});
+document.addEventListener("dragstart",event=>{
+  if(event.target.closest("[data-resize],.planner-block-unplan")){event.preventDefault();return;}
+  const row=event.target.closest("[data-task]");
+  if(!row)return;
+  draggingTaskId=row.dataset.task;
+  event.dataTransfer.setData("text/plain",row.dataset.task);
+  event.dataTransfer.effectAllowed="move";
+});
+document.addEventListener("dragend",()=>{
+  draggingTaskId=null;
+  document.querySelectorAll(".planner-drop-preview").forEach(el=>{
+    el.classList.remove("planner-drop-preview");
+    delete el.dataset.dropAt;
+  });
+});
+document.addEventListener("dragover",event=>{
+  const slot=event.target.closest(".slot.hour"),column=event.target.closest(".day-column");
+  if(slot||column||event.target.closest(".up-column,.month-day")){
+    event.preventDefault();
+    if(slot&&draggingTaskId){
+      document.querySelectorAll(".planner-drop-preview").forEach(el=>{
+        if(el!==slot){el.classList.remove("planner-drop-preview");delete el.dataset.dropAt;}
+      });
+      slot.classList.add("planner-drop-preview");
+      slot.dataset.dropAt=timeFromPointer(slot.dataset.hour,event.clientY,slot.getBoundingClientRect());
+    }
+  }
+});
+document.addEventListener("drop",event=>{
+  const period=event.target.closest(".up-column");
+  if(period){
+    event.preventDefault();
+    const task=state.tasks.find(t=>t.id===event.dataTransfer.getData("text/plain"));
+    if(task)applyPlan(task,period.dataset.planKind,period.dataset.planValue),save();
+    return;
+  }
+  const slot=event.target.closest(".slot.hour");
+  const column=event.target.closest(".day-column");
+  const monthDay=event.target.closest(".month-day");
+  if(!slot&&!column&&!monthDay)return;
+  event.preventDefault();
+  const task=state.tasks.find(t=>t.id===event.dataTransfer.getData("text/plain"));
+  if(!task)return;
+  const dateValue=(slot||column||monthDay).dataset.date;
+  let time;
+  if(slot)time=timeFromPointer(slot.dataset.hour,event.clientY,slot.getBoundingClientRect());
+  else if(column){
+    const rect=column.getBoundingClientRect(),scale=parseFloat(getComputedStyle(column.closest(".time-board")).getPropertyValue("--hour"))||plannerZoom;
+    const vertical=Math.max(0,Math.min(1439,(event.clientY-rect.top)/scale*60));
+    time=clockOf(vertical);
+  } else time=minutesOf(task.time)!==null?task.time:"09:00";
+  plannerTransaction(task,()=>scheduleAt(task,dateValue,time),"Scheduled "+task.title+" for "+dateValue+" "+time);
 });
 function toggleTheme() {
   state.theme = state.theme === "Light" ? "Black" : "Light";
