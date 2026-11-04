@@ -39,7 +39,7 @@ const gymURL = window.lifeosHosted
 let view =
     location.pathname === "/design-system" ? "Design system" : "Planner",
   date = now,
-  range = "Day",
+  range = ["Day","2 days","3 days","4 days","5 days","6 days","7 days","Week","Month"].includes(state.planner?.range) ? state.planner.range : "Day",
   upcomingMode = "Overview",
   upcomingAnchor = now;
 let plannerZoom = [40,56,72].includes(Number(state.planner?.hourHeight)) ? Number(state.planner.hourHeight) : 56;
@@ -498,9 +498,9 @@ function calendar() {
   return '<section class="card calendar-card" aria-label="Planner time blocking">'+
     '<div class="bar calendar-head"><div class="planner-toolbar-start">'+
       '<strong class="planner-toolbar-title">Time blocks</strong>'+
-      button("‹","prev","","class=planner-nav aria-label=Previous date range")+
-      button("Today","reset","","class=planner-today")+
-      button("›","next","","class=planner-nav aria-label=Next date range")+
+      button("‹","prev","",'class="planner-nav" aria-label="Previous date range"')+
+      button("Today","reset","",'class="planner-today"')+
+      button("›","next","",'class="planner-nav" aria-label="Next date range"')+
       '<label class="planner-date-label"><span class="sr-only">Planner date</span><input type="date" id="planner-date" aria-label="Planner date" value="'+safe(date)+'" title="'+safe(label)+'"></label></div>'+
     '<div class="planner-toolbar-end">'+
       '<label class="sr-only" for="range">Visible calendar days</label>'+
@@ -898,7 +898,8 @@ document.addEventListener("change", (e) => {
   }
   if (e.target.id === "range") {
     range = e.target.value;
-    render();
+    state.planner={...state.planner,range};
+    save();
   }
   if (e.target.matches("[data-quick-plan]")) {
     const task = state.tasks.find(t => t.id === e.target.dataset.quickPlan);
