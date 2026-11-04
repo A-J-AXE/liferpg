@@ -343,7 +343,10 @@ function row(t) {
           "</span></label>",
       )
       .join("") +
-    "</div></div>"
+    '</div><select class="mini-plan" aria-label="Plan ' + safe(t.title) + '" data-quick-plan="' + safe(t.id) + '">' +
+    '<option value="" selected>⋯</option><option value="today">Today</option><option value="tomorrow">Tomorrow</option>' +
+    '<option value="nextWeek">Next week</option><option value="nextMonth">Next month</option>' +
+    '<option value="someday">Someday</option><option value="inbox">Inbox</option></select></div>'
   );
 }
 function agenda() {
@@ -912,6 +915,22 @@ document.addEventListener("change", (e) => {
     range = e.target.value;
     render();
   }
+  if (e.target.matches("[data-quick-plan]")) {
+    const task = state.tasks.find(t => t.id === e.target.dataset.quickPlan);
+    if (!task) return;
+    const today = day();
+    const tomorrow = addDays(today,1);
+    const nextWeek = addDays(today,7);
+    const nextMonth = addMonths(today,1);
+    const choice = e.target.value;
+    if (choice === "today") applyPlan(task,"day",today);
+    if (choice === "tomorrow") applyPlan(task,"day",tomorrow);
+    if (choice === "nextWeek") applyPlan(task,"week",nextWeek);
+    if (choice === "nextMonth") applyPlan(task,"month",nextMonth);
+    if (choice === "someday") applyPlan(task,"someday");
+    if (choice === "inbox") applyPlan(task,"unscheduled");
+    if (choice) save();
+  }
 });
 document.addEventListener("submit", e => {
   const f = e.target.closest("form.up-quick");
@@ -1188,6 +1207,7 @@ function repeatAfter(t) {
     previous: t.id,
     series: t.series || t.id,
     date: next,
+    planning: {kind: t.time ? "exact-time" : "day", value: next},
     done: false,
     children: t.children.map((s) => ({ ...s, done: false })),
   });
@@ -1678,7 +1698,6 @@ function watchRituals() {
 setInterval(watchRituals, 15000);
 
 const listFilters = [
-  "Upcoming",
   "Tomorrow",
   "Next 7 Days",
   "This Week",

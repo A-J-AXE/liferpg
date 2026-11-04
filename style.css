@@ -1328,3 +1328,13 @@ task-date-picker {
 .lifeos-overview .agenda-stack { min-width:0; }
 @media (max-width:1000px) { .planner-layout { grid-template-columns:minmax(185px,230px) minmax(0,1fr);gap:8px; } }
 @media (max-width:760px) { .planner-layout { display:flex;flex-direction:column; } .planner-queue,.planner-layout .calendar-card { width:100%; } .planner-queue-items { max-height:220px; } .up-toolbar { flex-wrap:wrap; } .up-board { grid-auto-columns:minmax(235px,270px); } }
+
+/* Contextual native planning selector: visible on hover, focus and keyboard selection. */
+.row[data-task] .mini-plan {
+  flex:none;align-self:flex-start;max-width:29px;width:29px;min-height:25px;padding:2px 0 2px 3px;
+  border:1px solid transparent;background:transparent;color:var(--muted);
+  font-size:13px;opacity:.35;cursor:pointer;
+}
+.row[data-task]:hover .mini-plan,.row[data-task]:focus-within .mini-plan,
+.row[data-task] .mini-plan:focus-visible {opacity:1;border-color:var(--line);background:var(--panel);}
+.row[data-task] .mini-plan:focus-visible {outline:2px solid var(--accent);outline-offset:1px;}
