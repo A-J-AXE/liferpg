@@ -1,0 +1,1 @@
+{"name":"lifeos","private":true,"scripts":{"start":"node server.mjs"}}
