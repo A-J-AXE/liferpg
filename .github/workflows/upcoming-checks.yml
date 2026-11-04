@@ -1,0 +1,35 @@
+name: LifeOS Upcoming Boards PR
+on:
+  push:
+    branches: [feat/lifeos-upcoming-boards]
+  pull_request:
+    branches: [feat/lifeos-advanced-planner]
+jobs:
+  upcoming:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: node verify-upcoming.mjs
+      - run: node verify-planning.mjs
+      - run: node verify-planner-engine.mjs
+      - run: npm run typecheck
+      - run: npm run build:ui
+      - name: Upcoming browser and screenshots
+        run: LIFEOS_BROWSER=/usr/bin/google-chrome node verify-upcoming-ui.mjs
+      - name: Existing workspace regression
+        run: LIFEOS_BROWSER=/usr/bin/google-chrome node verify-workspace-ui.mjs
+      - name: Advanced Planner regression
+        run: LIFEOS_BROWSER=/usr/bin/google-chrome node verify-planner-ui.mjs
+      - name: Design system regression
+        run: LIFEOS_BROWSER=/usr/bin/google-chrome node verify-design-system.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lifeos-pr4-upcoming-screenshots
+          path: upcoming-screenshots/
+          if-no-files-found: ignore

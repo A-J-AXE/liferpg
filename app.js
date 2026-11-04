@@ -1,5 +1,5 @@
 import { searchTasks, renderSidebar } from "/shell.js";
-import { addDays, addMonths, planOf, applyPlan, upcomingHTML } from "./ui/planning.mjs";
+import { addDays, addMonths, planOf, applyPlan, upcomingHTML, columns, moveUpcomingTask, nudgeUpcomingTask, UPCOMING_SORTS } from "./ui/planning.mjs";
 import { PLANNER_HOURS, minutesOf, clockOf, clampDuration, timeFromPointer, scheduleAt, moveTaskBy, resizeTaskBy, snapshot, restore, layoutEvents } from "./ui/planner-engine.mjs";
 const $ = (s) => document.querySelector(s);
 const safe = (v) =>
@@ -42,6 +42,8 @@ let view =
   range = ["Day","2 days","3 days","4 days","5 days","6 days","7 days","Week","Month"].includes(state.planner?.range) ? state.planner.range : "Day",
   upcomingMode = "Overview",
   upcomingAnchor = now;
+let upcomingScrollLeft = 0, upcomingNotice = "";
+const upcomingSort = (mode) => state.upcoming?.sort?.[mode] || "manual";
 let plannerZoom = [40,56,72].includes(Number(state.planner?.hourHeight)) ? Number(state.planner.hourHeight) : 56;
 let plannerScrollTop = null, plannerScrollLeft = 0, plannerNotice = "";
 const plannerUndoStack = [], plannerRedoStack = [];
@@ -733,7 +735,7 @@ function render() {
           '</div><section class="review-grid"><div>' + fitnessSummary() +
           '</div><div class="card"><h2>Habits</h2>' + habits() + '</div></section>' + contentHub() + '</div>'
         : view === "Upcoming"
-          ? upcomingHTML({tasks:state.tasks,mode:upcomingMode,anchor:upcomingAnchor,today:day(),renderTask:row})
+          ? upcomingHTML({tasks:state.tasks,mode:upcomingMode,anchor:upcomingAnchor,today:day(),renderTask:row,sort:upcomingSort(upcomingMode)})
           : view === "Planner" || view === "Today" || view === "Agenda"
             ? '<div class="planner-layout">' + plannerQueue() + calendar() + '</div>'
             : '<div class="task-workspace">' + taskWorkspace() + '</div>';
@@ -741,6 +743,8 @@ function render() {
     tick();
     return;
   }
+  const previousBoard=$("#screen .up-scroller");
+  if(previousBoard)upcomingScrollLeft=previousBoard.scrollLeft;
   const oldPlannerScroll = $("#screen .calendar-scroll");
   if (oldPlannerScroll) {
     plannerScrollTop = oldPlannerScroll.scrollTop;
@@ -764,6 +768,8 @@ function render() {
     nextPlannerScroll.scrollTop = plannerScrollTop === null ? 7 * plannerZoom : plannerScrollTop;
     nextPlannerScroll.scrollLeft = plannerScrollLeft;
   }
+  const nextBoard=$("#screen .up-scroller");
+  if(nextBoard)nextBoard.scrollLeft=upcomingScrollLeft;
   tick();
   if (plannerNotice) {
     const message=plannerNotice;
@@ -790,15 +796,15 @@ document.addEventListener("click", (e) => {
       render();
       break;
     case "upMode":
-      upcomingMode = k; upcomingAnchor = day(); render(); break;
+      upcomingMode=k; upcomingAnchor=day(); upcomingScrollLeft=0; render(); break;
     case "upToday":
-      upcomingAnchor = day(); render(); break;
+      upcomingAnchor=day(); upcomingScrollLeft=0; render(); break;
     case "upPrev":
     case "upNext": {
       const step = b.dataset.act === "upNext" ? 1 : -1;
       upcomingAnchor = upcomingMode === "Month" ? addMonths(upcomingAnchor,step)
         : addDays(upcomingAnchor,step*(upcomingMode === "Week" ? 7 : 1));
-      render(); break;
+      upcomingScrollLeft=0;render();break;
     }
     case "close":
       $("#modal").close();
@@ -896,6 +902,13 @@ document.addEventListener("click", (e) => {
   }
 });
 document.addEventListener("change", (e) => {
+  if(e.target.id==="up-sort"){
+    const sort=e.target.value;
+    if(!UPCOMING_SORTS.includes(sort))return;
+    state.upcoming={...(state.upcoming||{}),sort:{...(state.upcoming?.sort||{}),[upcomingMode]:sort}};
+    upcomingNotice="Sorted by "+sort;
+    save();
+  }
   if (e.target.id === "planner-date") {
     if (e.target.value) {date=e.target.value;plannerScrollLeft=0;render();}
   }
@@ -978,6 +991,24 @@ document.addEventListener("pointercancel",()=>{
   if(resizing){resizing=null;render();}
 });
 document.addEventListener("keydown",event=>{
+  const upcomingRow=view==="Upcoming"?event.target.closest(".up-draggable[data-up-task]"):null;
+  if(upcomingRow&&event.altKey&&!event.ctrlKey&&!event.metaKey&&["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(event.key)&&!event.target.closest("input,select,textarea,[contenteditable]")){
+    const task=state.tasks.find(t=>t.id===upcomingRow.dataset.upTask);
+    if(!task||task.done)return;
+    event.preventDefault();
+    const list=columns(upcomingMode,upcomingAnchor,day());
+    const axis=["ArrowUp","ArrowDown"].includes(event.key)?"row":"column";
+    const dir=["ArrowDown","ArrowRight"].includes(event.key)?1:-1;
+    if(axis==="row" && upcomingSort(upcomingMode)!=="manual"){
+      state.upcoming={...(state.upcoming||{}),sort:{...(state.upcoming?.sort||{}),[upcomingMode]:"manual"}};
+    }
+    if(nudgeUpcomingTask(state.tasks,task,list,upcomingMode,day(),dir,axis)){
+      upcomingNotice=axis==="row"?"Task reordered":"Task moved to another period";
+      save();
+      $("#screen .up-draggable[data-up-task='"+task.id+"']")?.focus();
+    }
+    return;
+  }
   const grip=event.target.closest("[data-resize]");
   if(grip&&["ArrowUp","ArrowDown"].includes(event.key)){
     const task=state.tasks.find(t=>t.id===grip.dataset.resize);
@@ -1018,6 +1049,7 @@ document.addEventListener("dragstart",event=>{
   event.dataTransfer.effectAllowed="move";
 });
 document.addEventListener("dragend",()=>{
+  document.querySelectorAll(".up-drop-before,.up-drop-end").forEach(el=>el.classList.remove("up-drop-before","up-drop-end"));
   draggingTaskId=null;
   document.querySelectorAll(".planner-drop-preview").forEach(el=>{
     el.classList.remove("planner-drop-preview");
@@ -1025,6 +1057,15 @@ document.addEventListener("dragend",()=>{
   });
 });
 document.addEventListener("dragover",event=>{
+  const taskTarget=event.target.closest(".up-draggable[data-up-task]");
+  const upcomingCol=event.target.closest(".up-column");
+  if(upcomingCol&&draggingTaskId){
+    event.preventDefault();
+    document.querySelectorAll(".up-drop-before,.up-drop-end").forEach(el=>el.classList.remove("up-drop-before","up-drop-end"));
+    if(taskTarget&&taskTarget.dataset.upTask!==draggingTaskId)taskTarget.classList.add("up-drop-before");
+    else upcomingCol.classList.add("up-drop-end");
+    return;
+  }
   const slot=event.target.closest(".slot.hour"),column=event.target.closest(".day-column");
   if(slot||column||event.target.closest(".up-column,.month-day")){
     event.preventDefault();
@@ -1042,7 +1083,19 @@ document.addEventListener("drop",event=>{
   if(period){
     event.preventDefault();
     const task=state.tasks.find(t=>t.id===event.dataTransfer.getData("text/plain"));
-    if(task)applyPlan(task,period.dataset.planKind,period.dataset.planValue),save();
+    if(task){
+      const col=columns(upcomingMode,upcomingAnchor,day()).find(c=>c.id===period.dataset.columnId);
+      if(col){
+        const before=event.target.closest(".up-draggable[data-up-task]");
+        const beforeId=before?.dataset.upTask!==task.id?before?.dataset.upTask:null;
+        moveUpcomingTask(state.tasks,task,col,upcomingMode,day(),beforeId);
+        if(upcomingSort(upcomingMode)!=="manual"){
+          state.upcoming={...(state.upcoming||{}),sort:{...(state.upcoming?.sort||{}),[upcomingMode]:"manual"}};
+        }
+        upcomingNotice="Task planned in "+col.title;
+        save();
+      }
+    }
     return;
   }
   const slot=event.target.closest(".slot.hour");
@@ -1302,16 +1355,11 @@ function editFollowing(t, next) {
       (x.series || x.id) === (t.series || t.id) &&
       x.date >= t.date,
   )) {
-    for (const k of [
-      "title",
-      "repeat",
-      "time",
-      "project",
-      "notes",
-      "minutes",
-      "priority",
-    ])
-      later[k] = next[k];
+    for (const k of ["title","repeat","project","notes","minutes","priority"])
+      later[k]=next[k];
+    // Preserve each occurrence's own future date when editing a recurring series.
+    if(next.time)applyPlan(later,"exact-time",later.date,next.time);
+    else applyPlan(later,"day",later.date);
   }
 }
 function repeatAfter(t) {

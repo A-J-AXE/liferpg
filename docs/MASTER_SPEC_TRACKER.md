@@ -11,10 +11,10 @@ Source: user-provided 27-section master prompt, supplied in the LifeOS conversat
 | 3 | Analyze screenshots | PR #2 | Partially validated | Current and Akiflow screenshot references studied, visual deltas documented. |
 | 4 | REA Akiflow investigation | PR #2–4 | Blocked | Signed-in desktop app inaccessible here; metadata alone is not behavior. |
 | 5 | Proper view architecture | PR #1 | Partially validated | Separate task-only and time-grid workspace render paths. |
-| 6 | Upcoming Overview | PR #1, #4 | Partially validated | Today, This/Next Week, This/Next Month, Someday task buckets. |
-| 7 | Upcoming Day | PR #1, #4 | Partially validated | Daily task columns, quick add, navigation, movement. |
-| 8 | Upcoming Week | PR #1, #4 | Partially validated | Week-level tasks, no invented exact start. |
-| 9 | Upcoming Month | PR #1, #4 | Partially validated | Month-level tasks and rolling navigation. |
+| 6 | Upcoming Overview | PR #1, #4 | Partially validated | PR #4: Six buckets, nonduplicating records, sorting, manual order, completed disclosure. Browser and native acceptance pending. |
+| 7 | Upcoming Day | PR #1, #4 | Partially validated | PR #4: Seven daily columns, keyboard move, quick add, sorting and period navigation. Browser and native acceptance pending. |
+| 8 | Upcoming Week | PR #1, #4 | Partially validated | PR #4: Five rolling week columns, week-level moves without fabricated start time. Browser and native acceptance pending. |
+| 9 | Upcoming Month | PR #1, #4 | Partially validated | PR #4: Five rolling month columns, monthly quick add and keyboard period moves. Browser and native acceptance pending. |
 | 10 | Planner 1–7 days and time blocking | PR #1, #3 | Partially validated | PR #3: 24-hour grid, 15-min drag/drop, 1–7 day choices, overlap lanes, pointer/keyboard resize, zoom, undo/redo validated in headless Chrome. Windows/Electron and external-calendar overlays still unverified. |
 | 11 | Projects task-first | PR #1, #5 | Partially validated | Project tasks/progress, calendar excluded; grouping/filter pending. |
 | 12 | Consistent task data model | PR #1, #3–6 | Partially validated | Planning precision, project association, deadline and recurrence integrity. |
