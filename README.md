@@ -26,3 +26,12 @@ For DGX Spark Docker deployment, iPhone pairing, planner sync, MCP over SSH, and
 Open Settings → UI showcase or visit http://127.0.0.1:4310/design-system after starting LifeOS. The preview uses the same sidebar, typography and theme as the planner. Its sample task is separate from your records.
 
 Read [the design system](docs/DESIGN_SYSTEM.md) before editing the frontend. Use the official shadcn registry through MCP. From this directory run `npm run typecheck` and `npm run build:ui` after changing a component. Commit the generated assets so the desktop and Docker entry points serve the same version.
+
+
+## Design system and PR roadmap
+
+The LifeOS design playground is available at `http://127.0.0.1:4310/design-system` when the local server is running. It uses the same shadcn/Radix/Lucide source and semantic tokens as the application, with isolated interactive examples (no user task mutations).
+
+Codex design guidance lives in `.agents/skills/ui-ux-pro-max/` and `.agents/skills/frontend-ui-engineering/`. Use `docs/DESIGN_SYSTEM.md`, `design-system/lifeos/MASTER.md`, and `docs/MASTER_SPEC_TRACKER.md` for the permanent 27-section requirements and acceptance gates. `docs/COMPONENT_SOURCES.md` records upstream provenance and optional 21st.dev setup.
+
+Validation: `npm run typecheck`, `npm run build:ui`, `node verify-planning.mjs`, `LIFEOS_BROWSER=/usr/bin/google-chrome node verify-design-system.mjs`, and `node verify-workspace-ui.mjs`. The design CI uploads light, dark and narrow screenshots as artifacts.

@@ -4,7 +4,7 @@ A passing build is a baseline, not proof of design quality.
 
 ## Capture matrix
 
-At minimum capture Planner, Upcoming Overview, Upcoming Month, Inbox, Project and the \`/design-system\` playground at 1280×850 in Light and Black. Capture one narrow desktop layout and one 390px mobile view per major UI PR. Use reproducible Playwright screenshots and attach via GitHub Actions artifacts.
+At minimum capture Planner, Upcoming Overview, Upcoming Month, Inbox, Project and the `/design-system` playground at 1280×850 in Light and Black. Capture one narrow desktop layout and one 390px mobile view per major UI PR. Use reproducible Playwright screenshots and attach via GitHub Actions artifacts.
 
 ## Review in this order
 
