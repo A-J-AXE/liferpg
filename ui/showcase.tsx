@@ -249,7 +249,7 @@ function Showcase() {
             <p className="lo-lab-caption">Isolated component preview. Production tasks and rewards are not modified.</p>
           </section>
 
-          <aside className="lo-demo-side" aria-label="Focus and progression components">
+          <div className="lo-demo-side" role="complementary" aria-label="Focus and progression components">
             <section className="lo-focus-preview">
               <PaneHeading title="Focus" actions={<IconAction label="Reset demo focus session" icon={RotateCcw}
                 onClick={() => {setEnd(null);setLeft(timerMode === "Focus" ? 1500 : 300);notify("Timer reset.");}} />} />
@@ -291,7 +291,7 @@ function Showcase() {
                 <CommandIcon size={14} aria-hidden /> Try command palette
               </Button>
             </section>
-          </aside>
+          </div>
         </div>
 
         <div className="lo-lab-toast" role="status" aria-live="polite"><CheckCircle2 size={14} aria-hidden /> {notification}</div>
