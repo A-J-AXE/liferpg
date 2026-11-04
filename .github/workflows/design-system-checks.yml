@@ -1,0 +1,42 @@
+name: LifeOS Design System PR
+on:
+  push:
+    branches:
+      - feat/lifeos-premium-design-system
+  pull_request:
+    branches:
+      - feat/workspace-planning-boards
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify project-local design intelligence
+        run: |
+          python3 .agents/skills/ui-ux-pro-max/scripts/search.py "desktop productivity planning" --design-system -p LifeOS > /tmp/lifeos-design-recommendations.txt
+          test -s /tmp/lifeos-design-recommendations.txt
+          python3 .agents/skills/ui-ux-pro-max/scripts/search.py "compact accessible task controls" --stack shadcn > /tmp/lifeos-shadcn-recommendations.txt
+          test -s /tmp/lifeos-shadcn-recommendations.txt
+      - name: Planning model
+        run: node verify-planning.mjs
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Compile shadcn/React frontend
+        run: npm run build:ui
+      - name: New design-system interactions and screenshots
+        run: LIFEOS_BROWSER=/usr/bin/google-chrome node verify-design-system.mjs
+      - name: Existing workspace integration
+        run: LIFEOS_BROWSER=/usr/bin/google-chrome node verify-workspace-ui.mjs
+      - name: Upload screenshot evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lifeos-pr2-screenshots
+          path: workspace-screenshots/
+          if-no-files-found: ignore

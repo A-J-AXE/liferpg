@@ -19,6 +19,7 @@ import {
   useSidebar,
 } from "./components/ui/sidebar";
 import "./showcase";
+import { ShortcutKey } from "./lifeos-primitives";
 import {
   PanelsTopLeft,
   Inbox,
@@ -49,8 +50,6 @@ const groups = [
       [Inbox, "Inbox"],
       [CalendarDays, "Planner"],
       [ListChecks, "Upcoming"],
-      [CalendarDays, "Today"],
-      [ListChecks, "Tasks"],
       [Folders, "Projects"],
     ],
   ],
@@ -133,7 +132,7 @@ function Navigation({
                   <details className="more-views">
                     <summary>More views</summary>
                     <SidebarMenu>
-                      {lists.map((x) => item(CalendarDays, x))}
+                      {["Today", "Tasks", ...lists.filter((x) => x !== "Upcoming")].map((x) => item(CalendarDays, x))}
                     </SidebarMenu>
                   </details>
                 )}
@@ -185,7 +184,7 @@ function Navigation({
               >
                 <Search />
                 <span>Search</span>
-                <kbd>Ctrl K</kbd>
+                <ShortcutKey>Ctrl K</ShortcutKey>
               </SidebarMenuButton>
             </SidebarMenuItem>
             {item(Settings, "Settings")}
