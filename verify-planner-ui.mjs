@@ -79,9 +79,9 @@ try {
   await add.fill("Overlapping task");
   await add.press("Enter");
   const other=page.locator(".planner-queue [data-task]").filter({hasText:"Overlapping task"}).first();
-  const at1030=page.locator(".time-day").first().locator(".slot[data-hour='10']");
-  const rect=await at1030.boundingBox();
-  await other.dragTo(at1030,{targetPosition:{x:12,y:rect.height*.6}});
+  // Drop onto the existing event itself; this is the overlap interaction users actually perform.
+  const existingBlock=page.locator('.time-day').first().locator('.time-block[data-task="'+originalId+'"]');
+  await other.dragTo(existingBlock,{targetPosition:{x:10,y:6}});
   const overlapping=page.locator(".time-day").first().locator('.time-block[data-task]');
   assert.equal(await overlapping.count(),2);
   const widths=await overlapping.evaluateAll(elements=>elements.map(el=>el.getBoundingClientRect().width));
