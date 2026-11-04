@@ -55,9 +55,7 @@ try {
   let block=page.locator('.time-block[data-task="'+originalId+'"]');
   await block.focus();
   await block.press("ArrowUp");
-  saved=await page.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.id===arguments[0]),originalId).catch(async()=>
-    page.evaluate(id=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.id===id),originalId)
-  );
+  saved=await page.evaluate(id=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.id===id),originalId);
   assert.equal(saved.time,"10:30");
   await page.getByRole("button",{name:"Undo-planner-change"}).click();
   saved=await page.evaluate(id=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.id===id),originalId);
