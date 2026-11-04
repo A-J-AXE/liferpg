@@ -1,0 +1,39 @@
+name: LifeOS Advanced Planner PR
+on:
+  push:
+    branches:
+      - feat/lifeos-advanced-planner
+  pull_request:
+    branches:
+      - feat/lifeos-premium-design-system
+jobs:
+  planner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Planner scheduling math
+        run: node verify-planner-engine.mjs
+      - name: Task planning precision regression
+        run: node verify-planning.mjs
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Compile UI
+        run: npm run build:ui
+      - name: Advanced Planner Chrome interaction test
+        run: LIFEOS_BROWSER=/usr/bin/google-chrome node verify-planner-ui.mjs
+      - name: Existing workspace Chrome regressions
+        run: LIFEOS_BROWSER=/usr/bin/google-chrome node verify-workspace-ui.mjs
+      - name: Design system Chrome regressions
+        run: LIFEOS_BROWSER=/usr/bin/google-chrome node verify-design-system.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lifeos-pr3-planner-screenshots
+          path: planner-screenshots/
+          if-no-files-found: ignore
