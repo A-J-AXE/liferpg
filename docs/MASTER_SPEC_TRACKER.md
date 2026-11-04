@@ -15,20 +15,20 @@ Source: user-provided 27-section master prompt, supplied in the LifeOS conversat
 | 7 | Upcoming Day | PR #1, #4 | Partially validated | Daily task columns, quick add, navigation, movement. |
 | 8 | Upcoming Week | PR #1, #4 | Partially validated | Week-level tasks, no invented exact start. |
 | 9 | Upcoming Month | PR #1, #4 | Partially validated | Month-level tasks and rolling navigation. |
-| 10 | Planner 1–7 days and time blocking | PR #1, #3 | Partially validated | Hourly grid, 1–7 choice, drag/move/resize/overlap. |
+| 10 | Planner 1–7 days and time blocking | PR #1, #3 | Partially validated | PR #3: 24-hour grid, 15-min drag/drop, 1–7 day choices, overlap lanes, pointer/keyboard resize, zoom, undo/redo validated in headless Chrome. Windows/Electron and external-calendar overlays still unverified. |
 | 11 | Projects task-first | PR #1, #5 | Partially validated | Project tasks/progress, calendar excluded; grouping/filter pending. |
 | 12 | Consistent task data model | PR #1, #3–6 | Partially validated | Planning precision, project association, deadline and recurrence integrity. |
 | 13 | Action-first task creation | PR #1, #6 | Partially validated | Inline capture works; richer contextual editor pending. |
-| 14 | Date picker and navigation | PR #3, #6 | Partially validated | Date navigation and shadcn calendar present; full flows pending. |
+| 14 | Date picker and navigation | PR #3, #6 | Partially validated | PR #3: native compact date picker and range controls Chrome-tested; advanced task-editor contextual date flows remain PR #6. |
 | 15 | Task row design | PR #2, #5 | Implemented, unverified | Shared dense row, contextual actions, keyboard and hover review. |
 | 16 | Focus timer | PR #1, #8 | Partially validated | Persistent play/pause + modal; sessions/window pending. |
 | 17 | Google Calendar | PR #11 | Not started | Live OAuth, overlay, locking, duplicates, timezones. |
 | 18 | Keyboard-first | PR #7 | Partially validated | Cmd+K, capture and resize exist; full shortcuts/undo pending. |
 | 19 | No-AI-slop design system | PR #2 | Implemented, unverified | Tokens, UI skills, playground, screenshot gates. |
 | 20 | LifeRPG and OpenGym integration | PR #9–10 | Partially validated | Existing modules preserved; completion/regression needs validation. |
-| 21 | Responsive desktop | PR #2, #3–5, #13 | Partially validated | Board/timeline horizontal scroll, narrow and mobile visual tests. |
+| 21 | Responsive desktop | PR #2, #3–5, #13 | Partially validated | PR #3: 390px mobile + desktop Planner screenshots and horizontal grid scrolling validated in Chrome; native Electron and remaining workspaces need checks. |
 | 22 | State and persistence | PR #12 | Partially validated | Existing local/server sync retained; full cross-device test needed. |
-| 23 | Test scenarios | PR #1–13 | Partially validated | UI smoke + planning tests; remaining scenarios and actual integrations. |
+| 23 | Test scenarios | PR #1–13 | Partially validated | PR #3: pure Planner scheduling tests and Chrome scheduling, overlap, resize, undo, theme/mobile, plus PR #1/2 regression suites; live Google and Windows tests pending. |
 | 24 | Docs and permanent Codex rules | PR #2 | Implemented, unverified | AGENTS, design references, progress/acceptance tracker. |
 | 25 | Incremental implementation order | PR #1–13 | Implemented, unverified | Stacked PRs, per-feature tests and review. |
 | 26 | Final acceptance criteria | PR #13 | Not started | All workflow/visual/integration criteria must be evidenced. |

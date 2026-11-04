@@ -12,6 +12,7 @@ const files = {
   "/components.css": "components.css",
   "/app.js": "app.js",
   "/ui/planning.mjs": "ui/planning.mjs",
+  "/ui/planner-engine.mjs": "ui/planner-engine.mjs",
   "/style.css": "style.css",
 };
 http

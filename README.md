@@ -35,3 +35,8 @@ The LifeOS design playground is available at `http://127.0.0.1:4310/design-syste
 Codex design guidance lives in `.agents/skills/ui-ux-pro-max/` and `.agents/skills/frontend-ui-engineering/`. Use `docs/DESIGN_SYSTEM.md`, `design-system/lifeos/MASTER.md`, and `docs/MASTER_SPEC_TRACKER.md` for the permanent 27-section requirements and acceptance gates. `docs/COMPONENT_SOURCES.md` records upstream provenance and optional 21st.dev setup.
 
 Validation: `npm run typecheck`, `npm run build:ui`, `node verify-planning.mjs`, `LIFEOS_BROWSER=/usr/bin/google-chrome node verify-design-system.mjs`, and `node verify-workspace-ui.mjs`. The design CI uploads light, dark and narrow screenshots as artifacts.
+
+
+### Advanced Planner (stacked PR #3)
+
+The Planner time grid has 24 local hours and 15-minute snapping, overlapping event lanes, 1–7 visible days, persisted zoom, direct drag/keyboard scheduling, pointer/keyboard duration resizing and session-scoped undo/redo. Task-only Upcoming remains independent. Implementation: `ui/planner-engine.mjs`, `app.js`, `docs/advanced-planner.md`. Validation: `node verify-planner-engine.mjs` and `LIFEOS_BROWSER=/usr/bin/google-chrome node verify-planner-ui.mjs` after `npm run build:ui`.

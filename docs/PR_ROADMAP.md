@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | #1 | Workspace architecture (draft) | Planning precision, Planner-only time grid, Upcoming boards, task identity. |
 | #2 | Design system and interaction playground | Approved Codex skills, design tokens, actual working showcase, screenshot QA. |
-| #3 | Advanced Planner | 1–7 days, overlaps, dragging, resizing, viewport, keyboard, undo. |
+| #3 | Advanced Planner (draft, Chrome-validated) | Full-day 15-minute time grid, 1–7 days, overlaps, dragging, pointer/keyboard resizing, date/zoom, undo/redo. See docs/advanced-planner.md. |
 | #4 | Upcoming boards | Overview/Day/Week/Month sorting, recurrence, keyboard moves, nonduplicating records. |
 | #5 | Projects and Inbox | Task-first grouping, filtering, triage, contextual actions and bulk changes. |
 | #6 | Compact task editor | Progressive popovers, recurrence, attachments, notes, deadlines. |
