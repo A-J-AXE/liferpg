@@ -30,7 +30,7 @@ try {
   const inbox=p.locator("#screen form.task-quick input[name=title]");
   await inbox.fill("Inbox smoke test");await inbox.press("Enter");
   await nav("Planner");await p.locator("#range").selectOption("Day");
-  await p.locator(".planner-queue [data-task]").filter({hasText:"Inbox smoke test"}).first().dragTo(p.locator(".slot[data-hour='10']").first());
+  await p.locator(".planner-queue [data-task]").filter({hasText:"Inbox smoke test"}).first().dragTo(p.locator(".slot[data-hour='10']").first(),{targetPosition:{x:9,y:3}});
   const stored=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.title==="Inbox smoke test"));
   assert.equal(stored.time,"10:00");assert.equal(stored.planning.kind,"exact-time");
   const resizeHandle=p.locator('.time-block[data-task="'+stored.id+'"] .resize-grip');
@@ -41,7 +41,7 @@ try {
   await p.locator("#range").selectOption("2 days");
   const targetSlot=p.locator(".day-column").nth(1).locator(".slot[data-hour='11']");
   const newDate=await targetSlot.getAttribute("data-date");
-  await p.locator('.time-block[data-task="'+stored.id+'"]').dragTo(targetSlot);
+  await p.locator('.time-block[data-task="'+stored.id+'"]').dragTo(targetSlot,{targetPosition:{x:9,y:3}});
   const movedBlock=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.title==="Inbox smoke test"));
   assert.equal(movedBlock.date,newDate);
   assert.equal(movedBlock.time,"11:00");
