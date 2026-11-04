@@ -38,6 +38,13 @@ try {
   await resizeHandle.press("ArrowDown");
   const resized=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.title==="Inbox smoke test"));
   assert.equal(Number(resized.minutes),Number(stored.minutes)+15);
+  await p.locator("#range").selectOption("2 days");
+  const targetSlot=p.locator(".day-column").nth(1).locator(".slot[data-hour='11']");
+  const newDate=await targetSlot.getAttribute("data-date");
+  await p.locator('.time-block[data-task="'+stored.id+'"]').dragTo(targetSlot);
+  const movedBlock=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.title==="Inbox smoke test"));
+  assert.equal(movedBlock.date,newDate);
+  assert.equal(movedBlock.time,"11:00");
   await nav("Upcoming");assert.equal(await p.locator(".up-column").count(),6);
   assert.equal(await p.locator("#screen .time-board").count(),0);
   const month=p.locator('.up-column').filter({has:p.getByRole("heading",{name:"Next Month"})});
@@ -45,6 +52,9 @@ try {
   await month.locator("input[name=title]").press("Enter");
   const planned=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.title==="Month smoke test"));
   assert.equal(planned.planning.kind,"month");assert.equal(planned.date,"");assert.equal(planned.time,"");
+  await month.locator(".row[data-task]").filter({hasText:"Month smoke test"}).dragTo(p.locator('.up-column[data-plan-kind="someday"]'));
+  const movedToSomeday=await p.evaluate(()=>JSON.parse(localStorage.getItem("lifeos")).tasks.find(t=>t.title==="Month smoke test"));
+  assert.equal(movedToSomeday.planning.kind,"someday");
   await p.screenshot({path:"workspace-screenshots/upcoming-overview.png"});
   for(const [mode,count] of [["Day",7],["Week",5],["Month",5]]) {
     await p.getByRole("button",{name:mode,exact:true}).click();
