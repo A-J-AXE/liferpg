@@ -1764,3 +1764,15 @@ lifeos-showcase {display:block;min-width:0;}
 @media(prefers-reduced-motion:reduce) {
   #screen .time-board .time-block {transition:none;}
 }
+
+/* Short event blocks show one readable line instead of clipping two. */
+#screen .time-board .time-block.is-compact .time-block-main {
+  justify-content:center;flex-direction:row;align-items:center;
+  padding:1px 5px 2px;gap:0;min-height:0;
+}
+#screen .time-board .time-block.is-compact .block-title {
+  font-size:10px;line-height:1.15;font-weight:600;white-space:nowrap;
+  text-overflow:ellipsis;overflow:hidden;
+}
+#screen .time-board .time-block.is-compact .block-time {display:none;}
+#screen .time-board .time-block.is-compact .resize-grip {height:5px;}

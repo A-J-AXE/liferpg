@@ -456,9 +456,12 @@ function calendar() {
   function block(t,pos="") {
     const p=project(t.project), color=/^#[0-9a-f]{6}$/i.test(p?.color)?p.color:"var(--accent)";
     const name=t.title+" · "+t.time+" · "+t.minutes+" min"+(p?" · "+p.name:"");
-    const content='<span class="block-title">'+image(p)+safe(t.title)+'</span>'+
-      '<span class="block-time">'+safe(t.time)+' · '+Number(t.minutes)+'m</span>';
-    return '<div class="time-block" tabindex="0" role="group" aria-label="'+safe("Scheduled "+name)+
+    const compact=Number(t.minutes)<=30;
+    const content=compact
+      ? '<span class="block-title">'+safe(t.time)+' · '+safe(t.title)+'</span>'
+      : '<span class="block-title">'+image(p)+safe(t.title)+'</span>'+
+        '<span class="block-time">'+safe(t.time)+' · '+Number(t.minutes)+'m</span>';
+    return '<div class="time-block'+(compact?' is-compact':'')+'" tabindex="0" role="group" aria-label="'+safe("Scheduled "+name)+
       '. Arrow keys move 15 minutes or one day." draggable="true" data-task="'+safe(t.id)+
       '" style="--project:'+color+';'+pos+'">'+
       button(content,"edit",t.id,'class="time-block-main" aria-label="'+safe("Edit "+name)+'" title="'+safe(name)+'"')+
@@ -762,6 +765,15 @@ function render() {
     nextPlannerScroll.scrollLeft = plannerScrollLeft;
   }
   tick();
+  if (plannerNotice) {
+    const message=plannerNotice;
+    setTimeout(()=>{
+      if (plannerNotice!==message) return;
+      plannerNotice="";
+      const element=$("#screen .planner-status");
+      if(element) element.textContent="";
+    },4000);
+  }
 }
 document.addEventListener("click", (e) => {
   let b = e.target.closest("[data-act]");
@@ -1072,6 +1084,13 @@ function tick() {
     control.textContent = running ? "Ⅱ" : "▶";
     control.setAttribute("aria-label", running ? "Pause focus timer" : "Start focus timer");
     control.title = running ? "Pause timer" : "Start or resume timer";
+  }
+  // The current-time indicator tracks local time without rerendering the task grid.
+  const marker=$("#screen .planner-now-line");
+  if(marker){
+    const current=new Date();
+    if(marker.closest(".time-day")?.dataset.day===day(current))
+      marker.style.top="calc("+((current.getHours()*60+current.getMinutes())/60)+" * var(--hour))";
   }
 }
 $("#timer-toggle").onclick = () => {
