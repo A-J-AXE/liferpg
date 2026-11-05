@@ -151,6 +151,7 @@ function Composer({
   onRefresh,
   canLock,
   taskId,
+  focusChild,
   onDuplicate,
 }) {
   const [draft, setDraft] = useState(initial),
@@ -302,7 +303,17 @@ function Composer({
           }}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
-            title.current?.focus();
+            const fields = Array.from(
+              document.querySelectorAll(".task-subtask input"),
+            );
+            (focusChild
+              ? fields.find(
+                  (el) =>
+                    el.getAttribute("aria-label") ===
+                    "Rename subtask " + focusChild,
+                ) || title.current
+              : title.current
+            )?.focus();
           }}
           onEscapeKeyDown={(e) => {
             if (panel) {

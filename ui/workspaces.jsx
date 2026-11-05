@@ -114,90 +114,55 @@ function Quick({ ctx, period, project }) {
     </form>
   );
 }
-function Task({ t, ctx }) {
-  const p = ctx.projects.find((x) => x.id === t.project),
-    [rename, setRename] = useState(false),
-    [title, setTitle] = useState(t.title);
+function subTasks(parent) {
+  return (parent.children || []).map((record, index) => ({
+    ...record,
+    id: parent.id + "/sub/" + (record.id || index),
+    record,
+    parent,
+    project: parent.project,
+    minutes: record.minutes || 15,
+  }));
+}
+function ParentReference({ t, ctx }) {
+  return (
+    <button
+      type="button"
+      className="parent-ref"
+      onClick={(e) => ctx.edit(t.parent, e.currentTarget)}
+      title={"Open " + t.parent.title}
+    >
+      ↳ {t.parent.title}
+    </button>
+  );
+}
+function ChildRow({ t, ctx }) {
   return (
     <div
-      className="ws-task"
+      className="ws-task ws-child"
       data-task={t.id}
-      data-priority={t.priority}
-      draggable={!rename}
+      draggable
       onDragStart={(e) => e.dataTransfer.setData("text/plain", t.id)}
-      onClick={(e) => {
-        if (!e.target.closest("button,input,textarea,[role=menuitem]"))
-          ctx.edit(t, e.currentTarget);
-      }}
     >
       <input
         type="checkbox"
         aria-label={"Complete " + t.title}
         checked={t.done}
-        onChange={() => ctx.complete(t)}
+        onChange={() => ctx.childComplete(t)}
       />
       <div className="ws-task-name">
-        {rename ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (title.trim()) ctx.patch(t, { title: title.trim() });
-              setRename(false);
-            }}
-          >
-            <Input
-              autoFocus
-              aria-label="Rename task"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setRename(false);
-              }}
-            />
-          </form>
-        ) : (
-          <button title={t.title} onClick={(e) => ctx.edit(t, e.currentTarget)}>
-            {t.title}
-          </button>
-        )}
-        <small>
-          <button
-            type="button"
-            className="ws-project-chip"
-            aria-label={"Assign project for " + t.title}
-            onClick={(e) => ctx.assign(t, e.currentTarget)}
-          >
-            <Identity entity={p} />
-            {p?.name || "Personal"}
-          </button>
-          {t.time && <span>{t.time}</span>}
-          <span>{t.minutes}m</span>
-          {t.repeat && t.repeat !== "None" && (
-            <Repeat2 aria-label={t.repeat} size={12} />
-          )}{" "}
-          {t.children?.length > 0 && (
-            <span>
-              {t.children.filter((x) => x.done).length}/{t.children.length}
-            </span>
-          )}
-          {t.priority !== "None" && <span>{t.priority}</span>}
-        </small>
+        <button type="button" onClick={(e) => ctx.edit(t, e.currentTarget)}>
+          {t.title}
+        </button>
+        <ParentReference t={t} ctx={ctx} />
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Btn label={"Actions for " + t.title}>
-            <MoreHorizontal size={15} />
+            <MoreHorizontal size={14} />
           </Btn>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onSelect={() => {
-              setTitle(t.title);
-              setRename(true);
-            }}
-          >
-            Rename
-          </DropdownMenuItem>
+        <DropdownMenuContent>
           <DropdownMenuItem
             onSelect={() =>
               ctx.edit(
@@ -208,36 +173,171 @@ function Task({ t, ctx }) {
               )
             }
           >
-            Edit properties
+            Edit subtask
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => ctx.schedule(t)}>
-            Schedule in Planner
-          </DropdownMenuItem>
-          {[
-            ["Tomorrow", { kind: "day", value: offset(key(), 1) }],
-            [
-              "Next week",
-              { kind: "week", value: offset(week(key(), ctx.start), 7) },
-            ],
-            ["Next month", { kind: "month", value: month(key(), 1) }],
-            ["Someday", { kind: "someday", value: "" }],
-            ["Inbox", empty],
-          ].map(([name, p]) => (
-            <DropdownMenuItem key={name} onSelect={() => ctx.move(t, p)}>
-              Move to {name}
+          {t.time && (
+            <DropdownMenuItem
+              onSelect={() => ctx.childMove(t, { kind: "unscheduled" })}
+            >
+              Unschedule
             </DropdownMenuItem>
-          ))}
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
   );
 }
+function Task({ t, ctx }) {
+  const p = ctx.projects.find((x) => x.id === t.project),
+    [rename, setRename] = useState(false),
+    [title, setTitle] = useState(t.title);
+  const [expanded, setExpanded] = useState(true);
+  const children = subTasks(t);
+  return (
+    <>
+      <div
+        className="ws-task"
+        data-task={t.id}
+        data-priority={t.priority}
+        draggable={!rename}
+        onDragStart={(e) => e.dataTransfer.setData("text/plain", t.id)}
+        onClick={(e) => {
+          if (!e.target.closest("button,input,textarea,[role=menuitem]"))
+            ctx.edit(t, e.currentTarget);
+        }}
+      >
+        <input
+          type="checkbox"
+          aria-label={"Complete " + t.title}
+          checked={t.done}
+          onChange={() => ctx.complete(t)}
+        />
+        <div className="ws-task-name">
+          {rename ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (title.trim())
+                  (t.parent ? ctx.childPatch : ctx.patch)(t, {
+                    title: title.trim(),
+                  });
+                setRename(false);
+              }}
+            >
+              <Input
+                autoFocus
+                aria-label="Rename task"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setRename(false);
+                }}
+              />
+            </form>
+          ) : (
+            <button
+              title={t.title}
+              onClick={(e) => ctx.edit(t, e.currentTarget)}
+            >
+              {t.title}
+            </button>
+          )}
+          <small>
+            <button
+              type="button"
+              className="ws-project-chip"
+              aria-label={"Assign project for " + t.title}
+              title={p?.name || "Personal"}
+              onClick={(e) => ctx.assign(t, e.currentTarget)}
+            >
+              <Identity entity={p} />
+            </button>
+            {t.time && <span>{t.time}</span>}
+            <span>{t.minutes}m</span>
+            {t.repeat && t.repeat !== "None" && (
+              <Repeat2 aria-label={t.repeat} size={12} />
+            )}{" "}
+            {t.children?.length > 0 && (
+              <button
+                className="subtree-toggle"
+                type="button"
+                aria-expanded={expanded}
+                aria-label={expanded ? "Collapse subtasks" : "Expand subtasks"}
+                onClick={() => setExpanded(!expanded)}
+              >
+                {expanded ? "⌄" : "›"} {children.filter((x) => x.done).length}/
+                {children.length}
+              </button>
+            )}
+            {t.priority !== "None" && <span>{t.priority}</span>}
+          </small>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Btn label={"Actions for " + t.title}>
+              <MoreHorizontal size={15} />
+            </Btn>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onSelect={() => {
+                setTitle(t.title);
+                setRename(true);
+              }}
+            >
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() =>
+                ctx.edit(
+                  t,
+                  document.querySelector(
+                    '[data-task="' + CSS.escape(t.id) + '"] button',
+                  ),
+                )
+              }
+            >
+              Edit properties
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => ctx.schedule(t)}>
+              Schedule in Planner
+            </DropdownMenuItem>
+            {[
+              ["Tomorrow", { kind: "day", value: offset(key(), 1) }],
+              [
+                "Next week",
+                { kind: "week", value: offset(week(key(), ctx.start), 7) },
+              ],
+              ["Next month", { kind: "month", value: month(key(), 1) }],
+              ["Someday", { kind: "someday", value: "" }],
+              ["Inbox", empty],
+            ].map(([name, p]) => (
+              <DropdownMenuItem key={name} onSelect={() => ctx.move(t, p)}>
+                Move to {name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      {expanded && children.length > 0 && (
+        <div className="ws-subtree">
+          {children.map((child) => (
+            <ChildRow key={child.id} t={child} ctx={ctx} />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
 function drop(e, ctx, action) {
   e.preventDefault();
-  const t = ctx.tasks.find(
-    (t) => t.id === e.dataTransfer.getData("text/plain"),
-  );
+  const id = e.dataTransfer.getData("text/plain");
+  const t = ctx.tasks.find((t) => t.id === id);
   if (t) action(t);
+  else {
+    const child = ctx.tasks.flatMap(subTasks).find((t) => t.id === id);
+    if (child && e.currentTarget.closest(".ws-planner")) action(child);
+  }
 }
 function Upcoming({ ctx }) {
   const { mode, anchor } = ctx.prefs,
@@ -537,13 +637,22 @@ function Planner({ ctx }) {
       <div
         className="ws-pool"
         onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => drop(e, ctx, (t) => ctx.move(t, empty))}
+        onDrop={(e) =>
+          drop(e, ctx, (t) => (t.parent ? ctx.childMove : ctx.move)(t, empty))
+        }
       >
         <h2>To schedule</h2>
         <Quick ctx={ctx} period={empty} />
         {waiting.map((t) => (
           <Task key={t.id} t={t} ctx={ctx} />
         ))}
+        {ctx.tasks
+          .filter((t) => t.time && !t.trashed)
+          .flatMap(subTasks)
+          .filter((child) => !child.time && !child.done)
+          .map((child) => (
+            <ChildRow key={child.id} t={child} ctx={ctx} />
+          ))}
         <small>Drop here to unschedule</small>
       </div>
       <section className="ws-timeline">
@@ -636,7 +745,12 @@ function Planner({ ctx }) {
                 className="ws-date-heading"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) =>
-                  drop(e, ctx, (t) => ctx.move(t, { kind: "day", value: d }))
+                  drop(e, ctx, (t) =>
+                    (t.parent ? ctx.childMove : ctx.move)(t, {
+                      kind: "day",
+                      value: d,
+                    }),
+                  )
                 }
               >
                 {civil(d).toLocaleDateString(undefined, {
@@ -691,7 +805,10 @@ function Planner({ ctx }) {
             </div>
             {dates.map((d) => {
               const ext = externalFor(ctx.events, d).filter((e) => !e.allDay);
-              const items = ctx.tasks
+              const items = [
+                ...ctx.tasks,
+                ...ctx.tasks.filter((t) => !t.trashed).flatMap(subTasks),
+              ]
                 .filter((t) => t.date === d && t.time && !t.trashed)
                 .map((t) => ({
                   t,
@@ -709,7 +826,7 @@ function Planner({ ctx }) {
                     const y =
                       e.clientY - e.currentTarget.getBoundingClientRect().top;
                     drop(e, ctx, (t) =>
-                      ctx.move(
+                      (t.parent ? ctx.childMove : ctx.move)(
                         t,
                         { kind: "exact-time", value: d },
                         clock(
@@ -737,13 +854,28 @@ function Planner({ ctx }) {
                           t && e.dataTransfer.setData("text/plain", t.id)
                         }
                         className={
-                          "ws-block " + (t ? "time-block-task" : "external")
+                          "ws-block " +
+                          (t ? "time-block-task" : "external") +
+                          (t?.parent ? " ws-child-block" : "")
                         }
                         style={{
                           top: at * 0.8,
-                          height: Math.max(12, (until - at) * 0.8),
-                          left: (lane / width) * 100 + "%",
-                          width: 100 / width + "%",
+                          height: Math.max(
+                            t?.parent ? 20 : 12,
+                            (until - at) * (t?.parent ? 0.68 : 0.8),
+                          ),
+                          left:
+                            "calc(" +
+                            (lane / width) * 100 +
+                            "% + " +
+                            (t?.parent ? 18 : 0) +
+                            "px)",
+                          width:
+                            "calc(" +
+                            100 / width +
+                            "% - " +
+                            (t?.parent ? 18 : 0) +
+                            "px)",
                           "--block-color":
                             (t
                               ? ctx.projects.find((p) => p.id === t.project)
@@ -759,12 +891,29 @@ function Planner({ ctx }) {
                           disabled={!t}
                           onClick={(e) => ctx.edit(t, e.currentTarget)}
                         >
+                          {t?.project && (
+                            <span
+                              className="block-project-icon"
+                              title={
+                                ctx.projects.find((p) => p.id === t.project)
+                                  ?.name
+                              }
+                            >
+                              <Identity
+                                entity={ctx.projects.find(
+                                  (p) => p.id === t.project,
+                                )}
+                              />
+                            </span>
+                          )}
+                          {t?.parent && "↳ "}
                           {t?.title || ev.title}
                           <small>
                             {clock(at)}
                             {width > 1 ? " · Overlap" : ""}
                           </small>
                         </button>
+                        {t?.parent && <ParentReference t={t} ctx={ctx} />}
                         {t && (
                           <span
                             role="slider"
@@ -776,7 +925,7 @@ function Planner({ ctx }) {
                             onKeyDown={(e) => {
                               if (["ArrowUp", "ArrowDown"].includes(e.key)) {
                                 e.preventDefault();
-                                ctx.patch(t, {
+                                (t.parent ? ctx.childPatch : ctx.patch)(t, {
                                   minutes: String(
                                     Math.max(
                                       1,
@@ -822,7 +971,7 @@ function Planner({ ctx }) {
                               };
                               handle.onpointerup = (ev) => {
                                 clear();
-                                ctx.patch(t, {
+                                (t.parent ? ctx.childPatch : ctx.patch)(t, {
                                   minutes: String(duration(ev.clientY)),
                                 });
                               };

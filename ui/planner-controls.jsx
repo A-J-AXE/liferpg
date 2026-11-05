@@ -50,14 +50,16 @@ export function searchTasks(items, select, actions = []) {
             <CommandItem
               key={t.id}
               value={t.id}
-              keywords={[t.title, t.projectName]}
+              keywords={[t.title, t.projectName, t.parentTitle || ""]}
               onSelect={() => {
                 dismiss();
                 requestAnimationFrame(() => select(t.id));
               }}
             >
               {t.title}
-              <small>{t.projectName}</small>
+              <small>
+                {t.parentTitle ? "↳ " + t.parentTitle : t.projectName}
+              </small>
             </CommandItem>
           ))}
         </CommandGroup>

@@ -170,19 +170,10 @@ async function picture(file) {
     throw Error("Choose a PNG, JPEG, WebP, or GIF under 5 MB");
   const bm = await createImageBitmap(file);
   const c = document.createElement("canvas");
-  c.width = c.height = 180;
-  const side = Math.min(bm.width, bm.height);
-  c.getContext("2d").drawImage(
-    bm,
-    (bm.width - side) / 2,
-    (bm.height - side) / 2,
-    side,
-    side,
-    0,
-    0,
-    180,
-    180,
-  );
+  const scale = Math.min(1, 180 / Math.max(bm.width, bm.height));
+  c.width = Math.max(1, Math.round(bm.width * scale));
+  c.height = Math.max(1, Math.round(bm.height * scale));
+  c.getContext("2d").drawImage(bm, 0, 0, c.width, c.height);
   bm.close();
   return c.toDataURL("image/png");
 }
@@ -241,7 +232,7 @@ function assignProject(t, anchor) {
     },
   });
 }
-function taskForm(t, trigger, period) {
+function taskForm(t, trigger, period, focusChild) {
   const anchor =
     trigger ||
     document.querySelector('[data-act="add"]') ||
@@ -303,6 +294,7 @@ function taskForm(t, trigger, period) {
       save(tick);
     },
     initial,
+    focusChild,
     weekStart: plannerPrefs.weekStart,
     advance: advanceDate,
     onRefresh: t ? render : undefined,
@@ -405,7 +397,14 @@ function row(t) {
     '><div class="grow">' +
     button(safe(t.title), "edit", t.id) +
     '<div class="pill">' +
-    button(image(p) + safe(p?.name || "Personal"), "assign", t.id) +
+    button(
+      image(p) || safe(p?.art?.kind === "emoji" ? p.art.value : "◈"),
+      "assign",
+      t.id,
+      'class="ws-project-chip" title="' +
+        safe(p?.name || "Personal") +
+        '" aria-label="Assign project"',
+    ) +
     " · " +
     safe(t.priority) +
     " · " +
@@ -419,6 +418,9 @@ function row(t) {
         " subtasks"
       : "") +
     "</div>" +
+    (t.children.length
+      ? '<details class="legacy-subtree" open><summary>Subtasks</summary>'
+      : "") +
     t.children
       .map(
         (s, i) =>
@@ -430,9 +432,16 @@ function row(t) {
           (s.done ? "checked" : "") +
           "> " +
           safe(s.title) +
-          "</span></label>",
+          "</span></label>" +
+          button(
+            "↳ " + safe(t.title),
+            "edit",
+            t.id,
+            'class="legacy-parent-ref"',
+          ),
       )
       .join("") +
+    (t.children.length ? "</details>" : "") +
     "</div></div>"
   );
 }
@@ -697,6 +706,31 @@ function render() {
     theme: state.theme,
     onTheme: toggleTheme,
     onProject: () => projectForm(),
+    folders: state.folderArt,
+    folderChange(folder, { name, art }) {
+      const artwork = (state.folderArt ||= Object.create(null));
+      if (name !== undefined && name !== folder) {
+        if (name && state.projects.some((p) => p.folder === name))
+          throw Error("A folder with this name already exists");
+        for (const p of state.projects)
+          if (p.folder === folder) p.folder = name;
+        if (name && Object.hasOwn(artwork, folder))
+          Object.defineProperty(artwork, name, {
+            value: artwork[folder],
+            writable: true,
+            configurable: true,
+            enumerable: true,
+          });
+        delete artwork[folder];
+      } else if (art !== undefined)
+        Object.defineProperty(artwork, folder, {
+          value: art,
+          writable: true,
+          configurable: true,
+          enumerable: true,
+        });
+      save();
+    },
     projectChange: (p, changes) => {
       Object.assign(p, changes);
       save();
@@ -730,7 +764,22 @@ function render() {
       tasks: state.tasks,
       projects: state.projects,
       events: visibleEvents(),
-      edit: taskForm,
+      edit(t, anchor, period) {
+        taskForm(t?.parent || t, anchor, period, t?.parent ? t.title : null);
+      },
+      childComplete(child) {
+        child.record.done = !child.record.done;
+        save();
+      },
+      childPatch(child, changes) {
+        Object.assign(child.record, changes);
+        save();
+      },
+      childMove(child, period, time) {
+        if (period.kind === "exact-time") child.record.minutes ||= 15;
+        applyPlan(child.record, period, time);
+        save();
+      },
       assign: assignProject,
       complete,
       projectChange: (p, changes) => {
@@ -1679,14 +1728,22 @@ function findTask() {
   searchTasks(
     state.tasks
       .filter((t) => !t.trashed)
-      .map((t) => ({
-        id: t.id,
-        title: t.title,
-        projectName: project(t.project)?.name || "Personal",
-      })),
+      .flatMap((t) => {
+        const projectName = project(t.project)?.name || "Personal";
+        return [
+          { id: t.id, title: t.title, projectName },
+          ...t.children.map((child, index) => ({
+            id: t.id + "/sub/" + index,
+            title: child.title,
+            projectName,
+            parentTitle: t.title,
+          })),
+        ];
+      }),
     (id) => {
-      const t = state.tasks.find((t) => t.id === id);
-      if (t) taskForm(t);
+      const [parent, index] = id.split("/sub/");
+      const t = state.tasks.find((t) => t.id === parent);
+      if (t) taskForm(t, undefined, undefined, t.children[index]?.title);
     },
     [
       ["Create task", () => taskForm()],

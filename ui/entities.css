@@ -112,12 +112,99 @@
   width: 19px;
   height: 19px;
   border-radius: 4px;
-  object-fit: cover;
+  object-fit: contain;
+  flex: none;
 }
 .entity-art-trigger {
   width: 28px;
   height: 28px;
   flex: none;
+  padding: 0;
+}
+.folder-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.folder-name .entity-name {
+  flex: 1;
+}
+.folder-name > button[aria-haspopup="menu"] {
+  width: 25px;
+  flex: 0 0 25px;
+  padding: 2px;
+}
+.folder-name > .entity-name,
+.folder-name > .inline-name {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+}
+.folder-name > .entity-art-trigger {
+  flex: 0 0 28px;
+}
+.ws-project-chip,
+.pill .ws-project-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 23px;
+  height: 23px;
+  padding: 2px;
+  vertical-align: middle;
+}
+.ws-project-chip svg,
+.ws-project-chip img {
+  width: 17px;
+  height: 17px;
+  flex: none;
+}
+.ws-subtree,
+.legacy-subtree {
+  margin-inline-start: clamp(10px, 3%, 22px);
+  border-inline-start: 1px solid var(--line);
+  padding-inline-start: 6px;
+}
+.ws-child {
+  padding-block: 3px;
+}
+.ws-child .ws-task-name > button.parent-ref,
+.legacy-parent-ref {
+  color: var(--muted);
+  font-size: 10px;
+  min-height: 14px;
+  line-height: 14px;
+}
+.ws-child-block {
+  opacity: 0.86;
+}
+.ws-child-block button:first-child {
+  height: 55%;
+  font-size: 10px;
+  line-height: 10px;
+}
+.ws-child-block button.parent-ref {
+  height: 42%;
+  font-size: 9px;
+  line-height: 8px;
+}
+.ws-child-block [role="slider"] {
+  left: auto;
+  width: 16px;
+}
+.block-project-icon {
+  display: inline-flex;
+  align-self: center;
+}
+.block-project-icon svg,
+.block-project-icon img {
+  width: 13px;
+  height: 13px;
+}
+.legacy-subtree summary,
+.subtree-toggle {
+  color: var(--muted);
+  font-size: 11px;
 }
 .entity-picker {
   width: 230px;

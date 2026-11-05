@@ -348,6 +348,66 @@ export async function verifyWorkspaces(p, out) {
   await p.reload();
   await p.getByText(/Avoided today/).waitFor();
   await p.screenshot({ path: path.join(out, "Habits.png") });
+  await p.locator('#projects [data-key="' + project.id + '"]').click();
+  await p.getByRole("button", { name: "Project folder", exact: true }).click();
+  const folder = p.getByRole("textbox", { name: "Folder name" });
+  await folder.fill("Workshop");
+  await folder.press("Enter");
+  await p.keyboard.press("Escape");
+  const folderRow = p.locator(".folder-name").filter({ hasText: "Workshop" });
+  await folderRow
+    .getByRole("button", { name: "Rename Workshop", exact: true })
+    .click();
+  const folderName = p.getByRole("textbox", { name: "Rename folder" });
+  await folderName.fill("Engineering");
+  await folderName.press("Enter");
+  await p
+    .locator(".folder-name")
+    .filter({ hasText: "Engineering" })
+    .getByRole("button", { name: "Change image" })
+    .click();
+  await p.getByRole("button", { name: "Choose icon", exact: true }).click();
+  await p.getByPlaceholder("Search icons").fill("Code");
+  await p.getByRole("option", { name: "Code", exact: true }).click();
+  await p.reload();
+  assert.equal((await state()).folderArt.Engineering.value, "Code");
+  await p.locator(".ws-child").filter({ hasText: "Measure offset" }).waitFor();
+  await p.screenshot({ path: path.join(out, "Project-hierarchy.png") });
+  await p
+    .locator("#projects")
+    .screenshot({ path: path.join(out, "Project-folders.png") });
+  await nav("Planner");
+  const child = p
+    .locator(".ws-pool .ws-child")
+    .filter({ hasText: "Measure offset" });
+  await child.dragTo(p.locator(".ws-day").first(), {
+    targetPosition: { x: 20, y: 570 },
+  });
+  const childBlock = p
+    .locator(".ws-child-block")
+    .filter({ hasText: "Measure offset" });
+  await childBlock.waitFor();
+  const parentBlock = p
+    .locator(".ws-block")
+    .filter({ hasText: "Calibrate wrist joint" })
+    .first();
+  const [pb, cb] = await Promise.all([
+    parentBlock.boundingBox(),
+    childBlock.boundingBox(),
+  ]);
+  assert(
+    cb.x > pb.x &&
+      Math.abs(cb.x + cb.width - pb.x - pb.width) < 2 &&
+      cb.height < pb.height,
+  );
+  await childBlock
+    .getByRole("button", { name: "↳ Calibrate wrist joint" })
+    .click();
+  await p.getByLabel("Title", { exact: true }).waitFor();
+  await p.getByRole("button", { name: "Dismiss composer" }).click();
+  await p.reload();
+  await childBlock.waitFor();
+  await p.screenshot({ path: path.join(out, "Planner-hierarchy.png") });
   await nav("Overview");
   await none();
 }

@@ -1,3 +1,9 @@
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "./components/ui/dropdown-menu";
 export { renderEntityWorkspace } from "./entity-workspaces";
 import { Artwork, InlineName } from "./entity-controls";
 export { workspace } from "./workspaces";
@@ -81,6 +87,8 @@ function Navigation({
   onTheme,
   onProject,
   projectChange,
+  folders,
+  folderChange,
   readPicture,
   lists,
 }) {
@@ -171,8 +179,31 @@ function Navigation({
                   <div key={f}>
                     {f && (
                       <div className="folder-name">
-                        <FolderOpen size={14} />
-                        {f}
+                        <Artwork
+                          entity={{ art: folders?.[f] }}
+                          fallback={FolderOpen}
+                          read={readPicture}
+                          change={(art) => folderChange(f, { art })}
+                        />
+                        <InlineName
+                          value={f}
+                          label="Rename folder"
+                          change={(name) => folderChange(f, { name })}
+                        />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button aria-label={"Folder actions for " + f}>
+                              ⋯
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem
+                              onSelect={() => folderChange(f, { name: "" })}
+                            >
+                              Remove folder (keep projects)
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     )}
                     <SidebarMenu>
