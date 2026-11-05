@@ -348,6 +348,14 @@
   align-items: center;
   gap: 5px;
 }
+.habit-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+}
 .habit-streak[data-active="true"] {
   color: color-mix(in srgb, var(--ink) 62%, #eb790b);
   background: color-mix(in srgb, var(--panel) 87%, #efa34d);
@@ -357,15 +365,15 @@
   stroke: #a95015;
 }
 .habit-history {
-  width: max-content;
-  max-width: calc(100vw - 20px);
-  padding: 10px;
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
 }
-.habit-history-title {
-  display: block;
-  max-width: 224px;
-  overflow-wrap: anywhere;
-  font-size: 13px;
+.habit-history .rdp-root {
+  --cell-size: 26px;
+  margin-inline: auto;
+  padding: 0;
+  background: transparent;
 }
 .habit-history .rdp-day:not(.rdp-outside) {
   border-radius: 6px;
