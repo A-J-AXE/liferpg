@@ -1,0 +1,36 @@
+name: LifeOS rebuild shell QA
+on:
+  pull_request:
+    paths:
+      - "ui/rebuild/**"
+      - "rebuild.html"
+      - "server.mjs"
+      - "package.json"
+      - "verify-rebuild.mjs"
+      - ".github/workflows/rebuild-pr01.yml"
+  push:
+    branches: ["rebuild/lifeos-v31-pr01-shell"]
+jobs:
+  shell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build:rebuild
+      - name: Smoke and screenshot checks (8 viewports/themes)
+        run: npm run verify:rebuild
+        env:
+          LIFEOS_BROWSER: /usr/bin/google-chrome
+      - name: Upload screenshots for Gate B review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lifeos-pr01-screenshots
+          path: artifacts/rebuild-pr01/
+          if-no-files-found: warn

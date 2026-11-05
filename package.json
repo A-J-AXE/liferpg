@@ -6,7 +6,9 @@
     "desktop": "electron .",
     "verify": "node verify.mjs",
     "build:ui": "esbuild ui/shell.jsx --bundle --format=esm --minify --outfile=shell.js && tailwindcss -i ui/theme.css -o components.css --minify",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:rebuild": "esbuild ui/rebuild/app.jsx --bundle --format=esm --outfile=rebuild.js && tailwindcss -i ui/rebuild/theme.css -o rebuild.css --minify",
+    "verify:rebuild": "node verify-rebuild.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
