@@ -1,0 +1,15 @@
+name: LifeOS Rebuild — Source Lock Checks
+on:
+  push:
+    branches:
+      - rebuild/onion-pr00-source-lock
+  pull_request:
+    branches:
+      - feat/lifeos-rpg-home-dashboard
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify pinned imports, legal scope, and 51 reward golden checks
+        run: node verify-source-lock.mjs
