@@ -1,3 +1,4 @@
+import { Identity, Artwork, InlineName } from "./entity-controls";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -124,6 +125,10 @@ function Task({ t, ctx }) {
       data-priority={t.priority}
       draggable={!rename}
       onDragStart={(e) => e.dataTransfer.setData("text/plain", t.id)}
+      onClick={(e) => {
+        if (!e.target.closest("button,input,textarea,[role=menuitem]"))
+          ctx.edit(t, e.currentTarget);
+      }}
     >
       <input
         type="checkbox"
@@ -156,12 +161,15 @@ function Task({ t, ctx }) {
           </button>
         )}
         <small>
-          {p && (
-            <span>
-              {p.image ? <img alt="" src={p.image} /> : <Folder size={11} />}{" "}
-              {p.name}
-            </span>
-          )}{" "}
+          <button
+            type="button"
+            className="ws-project-chip"
+            aria-label={"Assign project for " + t.title}
+            onClick={(e) => ctx.assign(t, e.currentTarget)}
+          >
+            <Identity entity={p} />
+            {p?.name || "Personal"}
+          </button>
           {t.time && <span>{t.time}</span>}
           <span>{t.minutes}m</span>
           {t.repeat && t.repeat !== "None" && (
@@ -370,16 +378,85 @@ function List({ ctx, project }) {
     <section className="ws ws-list">
       {project && (
         <header className="ws-project">
-          <span>
-            {project.image ? <img src={project.image} alt="" /> : <Folder />}
-            {project.stage} · {project.skill}
-          </span>
+          <div className="entity-identity">
+            <Artwork
+              entity={project}
+              read={ctx.readPicture}
+              change={(art) =>
+                ctx.projectChange(project, {
+                  art,
+                  image: art?.kind === "image" ? art.value : "",
+                })
+              }
+            />
+            <InlineName
+              value={project.name}
+              label="Rename project"
+              change={(name) => ctx.projectChange(project, { name })}
+            />
+          </div>
+          <div className="project-property-row">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Btn label="Project folder">{project.folder || "Folder"}</Btn>
+              </PopoverTrigger>
+              <PopoverContent>
+                <Input
+                  aria-label="Folder name"
+                  defaultValue={project.folder}
+                  onBlur={(e) => {
+                    if (e.target.value !== project.folder)
+                      ctx.projectChange(project, {
+                        folder: e.target.value.trim(),
+                      });
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Btn label="Project color">Color</Btn>
+              </PopoverTrigger>
+              <PopoverContent>
+                <Input
+                  aria-label="Choose project color"
+                  type="color"
+                  value={project.color || "#74669e"}
+                  onChange={(e) =>
+                    ctx.projectChange(project, { color: e.target.value })
+                  }
+                />
+              </PopoverContent>
+            </Popover>
+            {[
+              ["Stage", "stage", ["Inbox", "In progress", "Completed"]],
+              ["Linked skill", "skill", ["", ...ctx.skills]],
+            ].map(([label, field, options]) => (
+              <DropdownMenu key={field}>
+                <DropdownMenuTrigger asChild>
+                  <Btn label={label}>{project[field] || label}</Btn>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {options.map((value) => (
+                    <DropdownMenuItem
+                      key={value}
+                      onSelect={() =>
+                        ctx.projectChange(project, { [field]: value })
+                      }
+                    >
+                      {value || "No linked skill"}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ))}
+          </div>
           <span>
             {all.filter((t) => t.done).length} of {all.length} done
           </span>
-          <Btn label="Edit project" onClick={() => ctx.projectEdit(project)}>
-            Edit project
-          </Btn>
         </header>
       )}
       <div className="ws-toolbar">

@@ -1,5 +1,6 @@
 @import "tailwindcss" source(none);
 @import "./workspaces.css";
+@import "./entities.css";
 @source "./";
 @custom-variant dark (&:is(.black *));
 @theme inline {

@@ -1,5 +1,7 @@
 # Interaction patterns
 
+Existing tasks use a full anchored editor with direct title and description, visible planning chips, and a subtask panel. Field changes commit on selection, Enter or blur. A new task still has an explicit Create action. Project rows separate image, name and navigation. The same artwork picker serves projects, skills and habits.
+
 ## Task composition
 
 Click Add task or press C to open a compact panel at the current task list. Type immediately. The date, project, priority and Create action are visible. More opens a named list of properties. Schedule shows time and duration together; Repeat shows its next occurrence and, on an existing task, the scope of the edit. File selection uses a button with a hidden picker. Create or Apply is the transaction boundary. An invalid task stays open with the draft intact. Escape first closes a property picker and then cancels the draft.

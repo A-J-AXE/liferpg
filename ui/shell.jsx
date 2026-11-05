@@ -1,7 +1,9 @@
+export { renderEntityWorkspace } from "./entity-workspaces";
+import { Artwork, InlineName } from "./entity-controls";
 export { workspace } from "./workspaces";
 export { backupLegacy } from "./planning-backup.mjs";
 export { plan, applyPlan } from "./planning.mjs";
-export { openComposer } from "./compact-composer";
+export { openComposer, openProjectPicker } from "./compact-composer";
 export { renderFocus } from "./compact-timer";
 export { searchTasks } from "./planner-controls";
 import React, { useEffect } from "react";
@@ -44,6 +46,7 @@ import {
   Search,
   PanelLeft,
   Layers2,
+  ChevronRight,
 } from "lucide-react";
 
 const groups = [
@@ -77,6 +80,8 @@ function Navigation({
   theme,
   onTheme,
   onProject,
+  projectChange,
+  readPicture,
   lists,
 }) {
   const { open, isMobile, setOpenMobile, toggleSidebar } = useSidebar();
@@ -173,7 +178,39 @@ function Navigation({
                     <SidebarMenu>
                       {projects
                         .filter((p) => (p.folder || "") === f)
-                        .map((p) => item(Folder, p.name, p.id, p.image))}
+                        .map((p) => (
+                          <SidebarMenuItem
+                            key={p.id}
+                            className="sidebar-project"
+                            data-active={view === p.id}
+                          >
+                            <Artwork
+                              entity={p}
+                              read={readPicture}
+                              change={(art) =>
+                                projectChange(p, {
+                                  art,
+                                  image: art?.kind === "image" ? art.value : "",
+                                })
+                              }
+                            />
+                            <InlineName
+                              value={p.name}
+                              label="Rename project"
+                              change={(name) => projectChange(p, { name })}
+                            />
+                            <SidebarMenuButton
+                              tooltip={"Open " + p.name}
+                              aria-label={p.name}
+                              aria-current={view === p.id ? "page" : undefined}
+                              data-act="nav"
+                              data-key={p.id}
+                              onClick={() => setOpenMobile(false)}
+                            >
+                              <ChevronRight />
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        ))}
                     </SidebarMenu>
                   </div>
                 ),

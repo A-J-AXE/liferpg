@@ -56,6 +56,7 @@ try {
   });
   await click("New project");
   await p.getByLabel("Project name").fill("Robotic arm");
+  await p.getByText("More properties", { exact: true }).click();
   await p.getByLabel("Linked skill").fill("Robotics");
   const png = await p.evaluate(() => {
     const c = document.createElement("canvas");
@@ -152,31 +153,48 @@ try {
     "Calibrate wrist joint",
   );
   await click("Dismiss composer");
-  // Edit one existing task and retain hidden properties through reload.
+  // Existing tasks expose routine controls without an Apply step.
   await click("Review joint limits");
-  for (const [panel, field, value] of [
-    ["Tags", "Tags", "robotics"],
-    ["Location", "Location", "Lab"],
-    ["Description", "Description", "Check the end stop"],
-  ]) {
-    await click("More task options");
-    await click(panel);
-    await p
-      .locator(".task-composer")
-      .getByLabel(field, { exact: true })
-      .fill(value);
-  }
-  await click("More task options");
+  const detail = p.locator(".task-detail");
+  await detail
+    .getByLabel("Title", { exact: true })
+    .fill("Review updated limits");
+  await detail.getByLabel("Title", { exact: true }).press("Enter");
+  await detail.getByLabel("Title", { exact: true }).fill("Review joint limits");
+  await detail.getByLabel("Title", { exact: true }).press("Enter");
+  await detail
+    .getByLabel("Description", { exact: true })
+    .fill("Check the end stop");
+  await detail.getByLabel("New subtask").fill("Inspect stop");
+  await detail.getByLabel("New subtask").press("Enter");
+  await detail.getByLabel("Complete subtask Inspect stop").check();
+  await click("Time");
+  await detail.getByLabel("Start time").fill("13:30");
+  await click("Duration");
+  await click("45m");
+  await click("Tags");
+  await detail
+    .getByRole("textbox", { name: "Tags", exact: true })
+    .fill("robotics");
+  await click("Location");
+  await detail
+    .getByRole("textbox", { name: "Location", exact: true })
+    .fill("Lab");
   await click("Repeat");
-  await p.getByLabel("Repeat", { exact: true }).selectOption("Weekly");
-  await click("More task options");
+  await detail
+    .getByRole("combobox", { name: "Repeat", exact: true })
+    .selectOption("Weekly");
   await click("Attachment");
   await p.getByLabel("Attach file", { exact: true }).setInputFiles({
     name: "limits.txt",
     mimeType: "text/plain",
     buffer: Buffer.from("Fixture attachment"),
   });
-  await click("Apply");
+  await click("Attachment");
+  await p
+    .locator(".task-detail")
+    .screenshot({ path: path.join(out, "Task-detail.png") });
+  await click("Dismiss composer");
   await p.locator(".task-composer").waitFor({ state: "hidden" });
   await p.reload();
   await p.waitForFunction(() =>
@@ -194,8 +212,10 @@ try {
   assert.equal(edited.notes, "Check the end stop");
   assert.equal(edited.repeat, "Weekly");
   assert.equal(edited.time, "13:30");
+  assert.equal(edited.minutes, "45");
+  assert.equal(edited.children[0].done, true);
   await nav("Habits");
-  await click("＋ New habit");
+  await click("New habit");
   await p.getByLabel("Habit", { exact: true }).fill("Practice control theory");
   await p.getByLabel("Skill", { exact: true }).selectOption("Robotics");
   await click("Save");
@@ -263,6 +283,15 @@ try {
   });
   await p.setViewportSize({ width: 610, height: 820 });
   await p.screenshot({ path: path.join(out, "LifeOS-Narrow.png") });
+  await click("Review joint limits");
+  const narrowEditor = p.locator(".task-detail");
+  await narrowEditor.getByLabel("New subtask").waitFor();
+  const editorBounds = await narrowEditor.boundingBox();
+  assert(editorBounds.x >= 0 && editorBounds.x + editorBounds.width <= 611);
+  await narrowEditor.screenshot({
+    path: path.join(out, "Task-detail-narrow.png"),
+  });
+  await click("Dismiss composer");
   assert(
     await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
   );
