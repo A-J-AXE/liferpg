@@ -6,6 +6,10 @@ import { availability } from "./booking.mjs";
 import { readFile } from "node:fs/promises";
 const files = {
   "/": "index.html",
+  "/rebuild": "rebuild.html",
+  "/rebuild/": "rebuild.html",
+  "/rebuild.js": "rebuild.js",
+  "/rebuild.css": "rebuild.css",
   "/shell.js": "shell.js",
   "/design-system": "index.html",
   "/shadcn-license.txt": "ui/SHADCN-LICENSE.txt",
