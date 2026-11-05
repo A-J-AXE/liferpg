@@ -1,3 +1,5 @@
+import { OptionMenu, ProjectProperties } from "./project-controls";
+import { Layers, Filter, ArrowDownUp } from "lucide-react";
 import { Identity, Artwork, InlineName } from "./entity-controls";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -400,7 +402,7 @@ function Upcoming({ ctx }) {
       >
         {cols.map((c, i) => {
           const tasks = ctx.tasks.filter(
-            (t) => !t.trashed && bucket(t, cols) === i,
+            (t) => !t.trashed && !t.done && bucket(t, cols) === i,
           );
           return (
             <section
@@ -449,7 +451,7 @@ function Upcoming({ ctx }) {
 const priorities = ["Goal", "High", "Medium", "Low", "None"];
 function List({ ctx, project }) {
   const [group, groupBy] = useState("Status"),
-    [filter, filterBy] = useState("All"),
+    [filter, filterBy] = useState("Open"),
     [sort, sortBy] = useState("Planned date");
   const all = ctx.tasks.filter(
     (t) =>
@@ -495,89 +497,47 @@ function List({ ctx, project }) {
               change={(name) => ctx.projectChange(project, { name })}
             />
           </div>
-          <div className="project-property-row">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Btn label="Project folder">{project.folder || "Folder"}</Btn>
-              </PopoverTrigger>
-              <PopoverContent>
-                <Input
-                  aria-label="Folder name"
-                  defaultValue={project.folder}
-                  onBlur={(e) => {
-                    if (e.target.value !== project.folder)
-                      ctx.projectChange(project, {
-                        folder: e.target.value.trim(),
-                      });
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") e.currentTarget.blur();
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Btn label="Project color">Color</Btn>
-              </PopoverTrigger>
-              <PopoverContent>
-                <Input
-                  aria-label="Choose project color"
-                  type="color"
-                  value={project.color || "#74669e"}
-                  onChange={(e) =>
-                    ctx.projectChange(project, { color: e.target.value })
-                  }
-                />
-              </PopoverContent>
-            </Popover>
-            {[
-              ["Stage", "stage", ["Inbox", "In progress", "Completed"]],
-              ["Linked skill", "skill", ["", ...ctx.skills]],
-            ].map(([label, field, options]) => (
-              <DropdownMenu key={field}>
-                <DropdownMenuTrigger asChild>
-                  <Btn label={label}>{project[field] || label}</Btn>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  {options.map((value) => (
-                    <DropdownMenuItem
-                      key={value}
-                      onSelect={() =>
-                        ctx.projectChange(project, { [field]: value })
-                      }
-                    >
-                      {value || "No linked skill"}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ))}
-          </div>
+          <ProjectProperties
+            project={project}
+            change={(patch) => ctx.projectChange(project, patch)}
+            folders={ctx.folders}
+            skills={ctx.skills}
+          />
           <span>
             {all.filter((t) => t.done).length} of {all.length} done
           </span>
         </header>
       )}
-      <div className="ws-toolbar">
+      <div
+        className="ws-toolbar project-icon-strip"
+        aria-label="Task list options"
+      >
         {[
-          ["Group", group, groupBy, ["Status", "Priority", "Planned date"]],
-          ["Filter", filter, filterBy, ["All", "Open", "Done"]],
-          ["Sort", sort, sortBy, ["Planned date", "Priority", "Title"]],
-        ].map(([name, v, fn, opts]) => (
-          <label key={name}>
-            {name}{" "}
-            <NativeSelect
-              size="sm"
-              aria-label={name}
-              value={v}
-              onChange={(e) => fn(e.target.value)}
-            >
-              {opts.map((o) => (
-                <option key={o}>{o}</option>
-              ))}
-            </NativeSelect>
-          </label>
+          [
+            "Group",
+            group,
+            groupBy,
+            ["Status", "Priority", "Planned date"],
+            Layers,
+          ],
+          ["Filter", filter, filterBy, ["All", "Open", "Done"], Filter],
+          [
+            "Sort",
+            sort,
+            sortBy,
+            ["Planned date", "Priority", "Title"],
+            ArrowDownUp,
+          ],
+        ].map(([label, value, change, opts, Icon]) => (
+          <OptionMenu
+            key={label}
+            label={label}
+            value={value}
+            change={change}
+            options={opts.map((value) => ({ value, label: value }))}
+          >
+            <Icon />
+          </OptionMenu>
         ))}
       </div>
       <Quick ctx={ctx} period={empty} project={project?.id} />
@@ -647,7 +607,7 @@ function Planner({ ctx }) {
           <Task key={t.id} t={t} ctx={ctx} />
         ))}
         {ctx.tasks
-          .filter((t) => t.time && !t.trashed)
+          .filter((t) => t.time && !t.trashed && !t.done)
           .flatMap(subTasks)
           .filter((child) => !child.time && !child.done)
           .map((child) => (
@@ -809,7 +769,14 @@ function Planner({ ctx }) {
                 ...ctx.tasks,
                 ...ctx.tasks.filter((t) => !t.trashed).flatMap(subTasks),
               ]
-                .filter((t) => t.date === d && t.time && !t.trashed)
+                .filter(
+                  (t) =>
+                    t.date === d &&
+                    t.time &&
+                    !t.trashed &&
+                    !t.done &&
+                    !t.parent?.done,
+                )
                 .map((t) => ({
                   t,
                   at: minute(t.time),

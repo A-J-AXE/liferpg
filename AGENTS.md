@@ -1,5 +1,7 @@
 # Frontend work in LifeOS
 
+For the RPG Overview, read the project-local UI UX Pro Max and Frontend UI Engineering skills, plus docs/COMPONENT_SOURCES.md and docs/VISUAL_ACCEPTANCE.md. Keep the character, destination grid and journal distinct. Exercise the isolated RPG playground before changing production behavior. Keep reward feedback tied to real receipts and respect reduced motion.
+
 1. Read `docs/DESIGN_SYSTEM.md` and the project skill at `.agents/skills/shadcn/SKILL.md` before frontend changes.
 2. Inspect `components.json`, `ui/components/ui/`, and existing compositions first.
 3. When a component is needed, search the official `@shadcn` registry using the shadcn MCP server and inspect the relevant item. If the server is unavailable, report that and restore it; do not quietly improvise a replacement.

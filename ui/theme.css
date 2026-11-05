@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
 @import "./workspaces.css";
 @import "./entities.css";
+@import "./rpg-home.css";
 @source "./";
 @custom-variant dark (&:is(.black *));
 @theme inline {

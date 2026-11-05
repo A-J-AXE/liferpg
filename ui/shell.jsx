@@ -1,3 +1,4 @@
+export { openProjectEditor } from "./project-controls";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -7,6 +8,7 @@ import {
 export { renderEntityWorkspace } from "./entity-workspaces";
 import { Artwork, InlineName } from "./entity-controls";
 export { workspace } from "./workspaces";
+export { renderRpg } from "./rpg-home";
 export { backupLegacy } from "./planning-backup.mjs";
 export { plan, applyPlan } from "./planning.mjs";
 export { openComposer, openProjectPicker } from "./compact-composer";
@@ -65,6 +67,7 @@ const groups = [
       [CalendarDays, "Planner"],
       [Layers2, "Upcoming"],
       [ListChecks, "Tasks"],
+      [ListChecks, "Completed tasks"],
       [Folders, "Projects"],
     ],
   ],

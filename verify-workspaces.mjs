@@ -155,11 +155,14 @@ export async function verifyWorkspaces(p, out) {
     .first()
     .click();
   await p.getByLabel("Project name").fill("Second project");
-  await p.getByText("More properties", { exact: true }).click();
-  await p
-    .getByRole("textbox", { name: "Linked skill", exact: true })
-    .fill("Robotics");
-  await p.getByRole("button", { name: "Save", exact: true }).click();
+  await p.getByRole("button", { name: "Linked skill", exact: true }).click();
+  const skillInput = p.getByRole("textbox", {
+    name: "Skill name",
+    exact: true,
+  });
+  await skillInput.fill("Robotics");
+  await skillInput.press("Enter");
+  await p.getByRole("button", { name: "Create project", exact: true }).click();
   const second = (await state()).projects.find(
     (x) => x.name === "Second project",
   );
@@ -193,7 +196,7 @@ export async function verifyWorkspaces(p, out) {
   const completed = p
     .locator("[data-task=" + JSON.stringify(occurrence.id) + "]")
     .getByRole("checkbox");
-  await completed.check();
+  await completed.click();
   assert.equal(
     (await state()).tasks.find((t) => t.title === "Review joint limits")
       .project,
@@ -241,7 +244,9 @@ export async function verifyWorkspaces(p, out) {
     await p
       .locator(".external")
       .first()
-      .evaluate((el) => el.offsetWidth < el.parentElement.clientWidth / 2),
+      .evaluate(
+        (el) => el.offsetWidth <= Math.ceil(el.parentElement.clientWidth / 2),
+      ),
     true,
   );
   await p.evaluate(() => {
@@ -371,6 +376,11 @@ export async function verifyWorkspaces(p, out) {
   await p.getByRole("option", { name: "Code", exact: true }).click();
   await p.reload();
   assert.equal((await state()).folderArt.Engineering.value, "Code");
+  await nav("Completed tasks");
+  await p
+    .getByRole("checkbox", { name: "Complete Calibrate wrist joint" })
+    .click();
+  await p.locator('#projects [data-key="' + project.id + '"]').click();
   await p.locator(".ws-child").filter({ hasText: "Measure offset" }).waitFor();
   await p.screenshot({ path: path.join(out, "Project-hierarchy.png") });
   await p

@@ -1,9 +1,18 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { Sprout, Swords, Target, Plus, MoreHorizontal } from "lucide-react";
+import {
+  Sprout,
+  Swords,
+  Target,
+  Plus,
+  MoreHorizontal,
+  Flame,
+} from "lucide-react";
 import { Artwork, InlineName } from "./entity-controls";
 import { Button } from "./components/ui/button";
 import { Progress } from "./components/ui/progress";
+import { Calendar } from "./components/ui/calendar";
+import { key } from "./planning.mjs";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -62,6 +71,54 @@ function Skills({ ctx }) {
         ))}
       </div>
     </>
+  );
+}
+function HabitHistory({ habit }) {
+  const today = new Date();
+  const todayKey = key(today);
+  const status = (date) => {
+    const dateKey = key(date);
+    if (habit.checkedOn(dateKey)) return "Checked in";
+    if (dateKey > todayKey) return "Upcoming";
+    if (habit.createdOn && dateKey < habit.createdOn)
+      return "Before habit started";
+    return "No check-in";
+  };
+  return (
+    <section
+      className="habit-history"
+      aria-label={habit.title + " check-in history"}
+    >
+      <Calendar
+        today={today}
+        endMonth={today}
+        showOutsideDays={false}
+        modifiers={{
+          checked: (date) => status(date) === "Checked in",
+          missed: (date) => status(date) === "No check-in",
+        }}
+        modifiersClassNames={{
+          checked: "habit-day-checked",
+          missed: "habit-day-missed",
+        }}
+        labels={{
+          labelGridcell: (date) =>
+            date.toLocaleDateString(undefined, { dateStyle: "full" }) +
+            " · " +
+            status(date),
+        }}
+      />
+      <div className="habit-history-legend">
+        <span>
+          <i className="habit-day-checked" aria-hidden="true" />
+          Checked in
+        </span>
+        <span>
+          <i className="habit-day-missed" aria-hidden="true" />
+          No check-in
+        </span>
+      </div>
+    </section>
   );
 }
 function Habits({ ctx }) {
@@ -142,18 +199,29 @@ function Habits({ ctx }) {
                     <>
                       <p>
                         <small>
-                          {h.checked ? "Checked in today" : "Ready to check in"}{" "}
-                          · {h.streak} day streak
+                          {h.checked
+                            ? "Checked in today"
+                            : "Ready to check in"}{" "}
                         </small>
                       </p>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        data-act="check"
-                        data-key={h.id}
-                      >
-                        {h.checked ? "Undo check-in" : "Check in"}
-                      </Button>
+                      <div className="habit-tile-actions">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          data-act="check"
+                          data-key={h.id}
+                        >
+                          {h.checked ? "Undo check-in" : "Check in"}
+                        </Button>
+                        <span
+                          className="habit-streak"
+                          data-active={h.streak > 0}
+                        >
+                          <Flame size={15} aria-hidden="true" />
+                          {h.streak} {h.streak === 1 ? "day" : "days"} streak
+                        </span>
+                      </div>
+                      <HabitHistory habit={h} />
                     </>
                   ) : (
                     <>
