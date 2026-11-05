@@ -107,6 +107,7 @@ export function InlineName({ value, change, label = "Name" }) {
       title={"Rename " + value}
       aria-label={"Rename " + value}
       onClick={() => {
+        cancel.current = false;
         type(value);
         set(true);
       }}

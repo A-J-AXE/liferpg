@@ -1,5 +1,7 @@
 import {
+  renderEntityWorkspace,
   openComposer,
+  openProjectPicker,
   workspace,
   plan,
   applyPlan,
@@ -161,28 +163,25 @@ function dialog(title, html, submit) {
 }
 async function picture(file) {
   if (!file?.size) return "";
+  if (
+    file.size > 5000000 ||
+    !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)
+  )
+    throw Error("Choose a PNG, JPEG, WebP, or GIF under 5 MB");
   const bm = await createImageBitmap(file);
   const c = document.createElement("canvas");
-  c.width = c.height = 180;
-  const side = Math.min(bm.width, bm.height);
-  c.getContext("2d").drawImage(
-    bm,
-    (bm.width - side) / 2,
-    (bm.height - side) / 2,
-    side,
-    side,
-    0,
-    0,
-    180,
-    180,
-  );
+  const scale = Math.min(1, 180 / Math.max(bm.width, bm.height));
+  c.width = Math.max(1, Math.round(bm.width * scale));
+  c.height = Math.max(1, Math.round(bm.height * scale));
+  c.getContext("2d").drawImage(bm, 0, 0, c.width, c.height);
   bm.close();
   return c.toDataURL("image/png");
 }
 function projectForm(p) {
   dialog(
-    "Project studio",
+    p ? "Project properties" : "New project",
     field("name", "Project name", "text", p?.name, "required") +
+      "<details><summary>More properties</summary>" +
       field("folder", "Sidebar folder", "text", p?.folder) +
       field("color", "Project color", "color", p?.color || "#74669e") +
       select(
@@ -191,9 +190,10 @@ function projectForm(p) {
         ["Inbox", "In progress", "Completed"].map((v) => [v, v]),
         p?.stage || "In progress",
       ) +
-      field("skill", "Linked skill", "text", p?.skill, "required") +
+      field("skill", "Linked skill", "text", p?.skill) +
       field("photo", "Your project image", "file", "", 'accept="image/*"') +
-      image(p),
+      image(p) +
+      "</details>",
     async (f) => {
       const next = {
         id: p?.id || id(),
@@ -201,26 +201,47 @@ function projectForm(p) {
         folder: f.folder.trim(),
         color: f.color,
         stage: f.stage,
-        skill: f.skill.trim(),
+        skill: f.skill.trim() || "",
         image: (await picture(f.photo)) || p?.image || "",
       };
-      if (!next.name || !next.skill)
-        throw Error("Enter a project and skill name");
+      if (!next.name) throw Error("Enter a project name");
       if (p) Object.assign(p, next);
       else state.projects.push(next);
-      if (!state.skills.includes(next.skill)) state.skills.push(next.skill);
+      if (next.skill && !state.skills.includes(next.skill))
+        state.skills.push(next.skill);
       view = next.id;
     },
   );
 }
 const priorities = ["None", "Low", "Medium", "High", "Goal"];
-function taskForm(t, trigger, period) {
+function projectChoices() {
+  return state.projects.map((p) => ({
+    ...p,
+    uses: state.tasks.filter((t) => t.project === p.id).length,
+  }));
+}
+function assignProject(t, anchor) {
+  openProjectPicker({
+    anchor,
+    projects: projectChoices(),
+    selected: t.project,
+    choose(id) {
+      t.project = id;
+      if (project(id)) project(id).lastUsed = Date.now();
+      save();
+    },
+  });
+}
+function taskForm(t, trigger, period, focusChild) {
   const anchor =
     trigger ||
     document.querySelector('[data-act="add"]') ||
     document.querySelector("main header");
   const initial = {
     title: t?.title || "",
+    childRows: t?.children || [],
+    link: t?.link || "",
+    lockOverride: t?.lockOverride,
     project: t?.project ?? project(view)?.id ?? "",
     date:
       t?.date ??
@@ -248,11 +269,35 @@ function taskForm(t, trigger, period) {
   };
   openComposer({
     anchor,
-    projects: state.projects,
+    projects: projectChoices(),
     editing: !!t,
+    canLock: !!state.config?.lockCalendar,
+    taskId: t?.id,
+    onDuplicate() {
+      if (!t) return;
+      const copy = structuredClone(t);
+      Object.assign(copy, {
+        id: id(),
+        done: false,
+        trashed: false,
+        locked: false,
+        title: t.title + " (copy)",
+      });
+      delete copy.previous;
+      delete copy.series;
+      copy.children = copy.children.map((c) => ({
+        ...c,
+        id: id(),
+        done: false,
+      }));
+      state.tasks.push(copy);
+      save(tick);
+    },
     initial,
+    focusChild,
     weekStart: plannerPrefs.weekStart,
     advance: advanceDate,
+    onRefresh: t ? render : undefined,
     onTrash() {
       if (t) {
         t.trashed = !t.trashed;
@@ -276,6 +321,7 @@ function taskForm(t, trigger, period) {
         trashed,
         completed,
         period: periodToKeep,
+        childRows,
         ...fields
       } = f;
       const next = {
@@ -285,14 +331,16 @@ function taskForm(t, trigger, period) {
         file,
         id: t?.id || id(),
         done: t?.done || false,
-        children: f.children
-          .split("\n")
-          .map((x) => x.trim())
-          .filter(Boolean)
-          .map((title) => ({
-            title,
-            done: t?.children.find((x) => x.title === title)?.done || false,
-          })),
+        children:
+          (t && childRows) ||
+          f.children
+            .split("\n")
+            .map((x) => x.trim())
+            .filter(Boolean)
+            .map((title) => ({
+              title,
+              done: t?.children.find((x) => x.title === title)?.done || false,
+            })),
       };
 
       if (
@@ -303,17 +351,19 @@ function taskForm(t, trigger, period) {
       if (t) {
         if (next.date || !next.period) delete t.period;
         if (f.scope === "series") editFollowing(t, next);
+        if (t.project !== next.project && project(next.project))
+          project(next.project).lastUsed = Date.now();
         Object.assign(t, next);
         if (t.done !== Boolean(completed)) {
-          complete(t);
+          complete(t, tick);
           return;
         }
       } else state.tasks.push(next);
-      save();
+      save(t ? tick : render);
     },
   });
 }
-function complete(t) {
+function complete(t, refresh = render) {
   t.done = !t.done;
   if (t.done)
     state.receipts[t.id] = {
@@ -327,7 +377,7 @@ function complete(t) {
     repeatAfter(t);
     feedback();
   }
-  save();
+  save(refresh);
 }
 function row(t) {
   const p = project(t.project);
@@ -347,7 +397,14 @@ function row(t) {
     '><div class="grow">' +
     button(safe(t.title), "edit", t.id) +
     '<div class="pill">' +
-    button(image(p) + safe(p?.name || "Personal"), "assign", t.id) +
+    button(
+      image(p) || safe(p?.art?.kind === "emoji" ? p.art.value : "◈"),
+      "assign",
+      t.id,
+      'class="ws-project-chip" title="' +
+        safe(p?.name || "Personal") +
+        '" aria-label="Assign project"',
+    ) +
     " · " +
     safe(t.priority) +
     " · " +
@@ -361,6 +418,9 @@ function row(t) {
         " subtasks"
       : "") +
     "</div>" +
+    (t.children.length
+      ? '<details class="legacy-subtree" open><summary>Subtasks</summary>'
+      : "") +
     t.children
       .map(
         (s, i) =>
@@ -372,9 +432,16 @@ function row(t) {
           (s.done ? "checked" : "") +
           "> " +
           safe(s.title) +
-          "</span></label>",
+          "</span></label>" +
+          button(
+            "↳ " + safe(t.title),
+            "edit",
+            t.id,
+            'class="legacy-parent-ref"',
+          ),
       )
       .join("") +
+    (t.children.length ? "</details>" : "") +
     "</div></div>"
   );
 }
@@ -539,6 +606,90 @@ window.addEventListener("popstate", () => {
   previousView = view;
   render();
 });
+function entityContext() {
+  const limit = state.config?.threshold || 100;
+  return {
+    limit,
+    readPicture: picture,
+    skills: state.skills.map((name) => ({
+      name,
+      xp: total("xp", name),
+      art: state.skillArt?.[name],
+    })),
+    habits: state.habits.map((h) => ({
+      ...h,
+      streak: streak(h),
+      checked: !!state.receipts[h.id + now],
+    })),
+    battles: (state.battles || []).map((h) => ({
+      ...h,
+      status:
+        h.daily?.[now] ||
+        ((h.log || []).some((v) => day(new Date(v)) === now) ? "occurred" : ""),
+    })),
+    skillArt(name, art) {
+      (state.skillArt ||= {})[name] = art;
+      save();
+    },
+    skillRename(from, to) {
+      if (
+        state.skills.some(
+          (name) => name.toLowerCase() === to.toLowerCase() && name !== from,
+        )
+      )
+        throw Error("A skill with this name exists");
+      state.skills = state.skills.map((name) => (name === from ? to : name));
+      if ((state.gymSkill || "Gym") === from) state.gymSkill = to;
+      if (state.skillArt && Object.hasOwn(state.skillArt, from)) {
+        Object.defineProperty(state.skillArt, to, {
+          value: state.skillArt[from],
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
+        delete state.skillArt[from];
+      }
+      for (const item of [
+        ...state.projects,
+        ...state.habits,
+        ...Object.values(state.receipts),
+      ])
+        if (item.skill === from) item.skill = to;
+      save();
+    },
+    habitPatch(h, patch) {
+      const target = [...state.habits, ...(state.battles || [])].find(
+        (x) => x.id === h.id,
+      );
+      if (target) {
+        Object.assign(target, patch);
+        save();
+      }
+    },
+    battleStatus(h, outcome) {
+      const target = state.battles.find((x) => x.id === h.id);
+      if (!target) return;
+      const daily = (target.daily ||= {});
+      // Keep legacy lapse history. Only replace the timestamp created by this editor.
+      const entries = (target.dailyLog ||= {});
+      if (entries[now])
+        target.log = target.log.filter((x) => x !== entries[now]);
+      delete entries[now];
+      if (outcome) {
+        daily[now] = outcome;
+        if (
+          outcome === "occurred" &&
+          !target.log.some((v) => day(new Date(v)) === now)
+        ) {
+          const at = new Date().toISOString();
+          entries[now] = at;
+          target.log.push(at);
+        }
+      } else delete daily[now];
+      save();
+    },
+  };
+}
 function render() {
   if (view !== previousView) {
     if (previousView && viewFromUrl() !== view)
@@ -555,9 +706,50 @@ function render() {
     theme: state.theme,
     onTheme: toggleTheme,
     onProject: () => projectForm(),
+    folders: state.folderArt,
+    folderChange(folder, { name, art }) {
+      const artwork = (state.folderArt ||= Object.create(null));
+      if (name !== undefined && name !== folder) {
+        if (name && state.projects.some((p) => p.folder === name))
+          throw Error("A folder with this name already exists");
+        for (const p of state.projects)
+          if (p.folder === folder) p.folder = name;
+        if (name && Object.hasOwn(artwork, folder))
+          Object.defineProperty(artwork, name, {
+            value: artwork[folder],
+            writable: true,
+            configurable: true,
+            enumerable: true,
+          });
+        delete artwork[folder];
+      } else if (art !== undefined)
+        Object.defineProperty(artwork, folder, {
+          value: art,
+          writable: true,
+          configurable: true,
+          enumerable: true,
+        });
+      save();
+    },
+    projectChange: (p, changes) => {
+      Object.assign(p, changes);
+      save();
+    },
+    readPicture: picture,
     lists: listFilters,
   });
   document.documentElement.dataset.effects = state.config?.effect || "on";
+  if (["Skills", "Habits", "Battle"].includes(view)) {
+    const screen = $("#screen");
+    if (!screen.querySelector("#entity-workspace"))
+      screen.innerHTML =
+        '<div class="hero"><h1></h1></div><div id="entity-workspace"></div>';
+    screen.querySelector("h1").textContent =
+      view === "Battle" ? "Habits" : view;
+    renderEntityWorkspace($("#entity-workspace"), view, entityContext());
+    tick();
+    return;
+  }
   const specialized =
     ["Planner", "Upcoming", "Inbox"].includes(view) || !!project(view);
   const screen = $("#screen");
@@ -572,9 +764,30 @@ function render() {
       tasks: state.tasks,
       projects: state.projects,
       events: visibleEvents(),
-      edit: taskForm,
+      edit(t, anchor, period) {
+        taskForm(t?.parent || t, anchor, period, t?.parent ? t.title : null);
+      },
+      childComplete(child) {
+        child.record.done = !child.record.done;
+        save();
+      },
+      childPatch(child, changes) {
+        Object.assign(child.record, changes);
+        save();
+      },
+      childMove(child, period, time) {
+        if (period.kind === "exact-time") child.record.minutes ||= 15;
+        applyPlan(child.record, period, time);
+        save();
+      },
+      assign: assignProject,
       complete,
-      projectEdit: projectForm,
+      projectChange: (p, changes) => {
+        Object.assign(p, changes);
+        save();
+      },
+      readPicture: picture,
+      skills: state.skills,
       pref(changes) {
         Object.assign(plannerPrefs, changes);
         if ((changes.date || changes.days) && Object.keys(overlayPrefs).length)
@@ -669,23 +882,6 @@ function render() {
             "</p></article>",
         )
         .join("");
-  else if (view === "Skills")
-    body =
-      button("New skill", "newSkill") +
-      skills() +
-      earned()
-        .map(
-          (r) =>
-            '<div class="row">' +
-            safe(r.title) +
-            " · " +
-            safe(r.skill) +
-            " +" +
-            r.xp +
-            " XP</div>",
-        )
-        .join("");
-  else if (view === "Habits") body = habits();
   else if (view === "Settings")
     body =
       button("Edit profile", "profile") +
@@ -950,7 +1146,7 @@ window.addEventListener("message", (event) => {
       receipts["gym:" + w.id] = {
         title: w.name,
         date: w.date,
-        skill: "Gym",
+        skill: state.gymSkill || "Gym",
         xp: 25,
         coins: 4,
       };
@@ -1164,23 +1360,6 @@ function extendedPage() {
         )
         .join("") +
       button("Edit identity", "identity")
-    );
-  if (view === "Battle")
-    return (
-      button("Add bad habit", "newBattle") +
-      (state.battles || [])
-        .map(
-          (b) =>
-            '<div class="card">' +
-            safe(b.name) +
-            " · " +
-            (b.log || []).length +
-            " lapses " +
-            button("Log lapse", "lapse", b.id) +
-            button("Undo last", "undoLapse", b.id) +
-            "</div>",
-        )
-        .join("")
     );
   if (view === "Goals")
     return (
@@ -1549,14 +1728,22 @@ function findTask() {
   searchTasks(
     state.tasks
       .filter((t) => !t.trashed)
-      .map((t) => ({
-        id: t.id,
-        title: t.title,
-        projectName: project(t.project)?.name || "Personal",
-      })),
+      .flatMap((t) => {
+        const projectName = project(t.project)?.name || "Personal";
+        return [
+          { id: t.id, title: t.title, projectName },
+          ...t.children.map((child, index) => ({
+            id: t.id + "/sub/" + index,
+            title: child.title,
+            projectName,
+            parentTitle: t.title,
+          })),
+        ];
+      }),
     (id) => {
-      const t = state.tasks.find((t) => t.id === id);
-      if (t) taskForm(t);
+      const [parent, index] = id.split("/sub/");
+      const t = state.tasks.find((t) => t.id === parent);
+      if (t) taskForm(t, undefined, undefined, t.children[index]?.title);
     },
     [
       ["Create task", () => taskForm()],
@@ -1719,7 +1906,11 @@ function syncBlocks() {
       calendar: state.config.lockCalendar,
       private: state.config.privateBlocks,
       remove:
-        !t.time || !t.date || t.trashed || (t.done && state.config.unlockDone),
+        t.lockOverride === false ||
+        !t.time ||
+        !t.date ||
+        t.trashed ||
+        (t.done && state.config.unlockDone),
     };
     if (payload.remove && !lockCache.has(t.id) && !t.locked) continue;
     if (!payload.remove) {
@@ -1934,7 +2125,7 @@ async function refreshTraining() {
         receipts["gym:" + w.id] = {
           title: w.name || "Workout",
           date: w.d,
-          skill: "Gym",
+          skill: state.gymSkill || "Gym",
           xp: 25,
           coins: 4,
         };
@@ -1998,16 +2189,7 @@ document.addEventListener("click", (e) => {
   if (b.dataset.act === "switchTheme") toggleTheme();
   if (b.dataset.act === "assign") {
     const t = state.tasks.find((t) => t.id === b.dataset.key);
-    dialog(
-      "Assign project",
-      select(
-        "project",
-        "Project",
-        [["", "Personal"], ...state.projects.map((p) => [p.id, p.name])],
-        t.project,
-      ),
-      (f) => (t.project = f.project),
-    );
+    if (t) assignProject(t, b);
   }
 });
 

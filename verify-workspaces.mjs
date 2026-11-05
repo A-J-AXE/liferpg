@@ -116,10 +116,11 @@ export async function verifyWorkspaces(p, out) {
   });
   assert.equal((await target()).time, "13:30");
   await row().getByRole("button").click();
-  await p.getByRole("button", { name: "More task options" }).click();
   await p.getByRole("button", { name: "Deadline", exact: true }).click();
-  await p.getByLabel("Deadline", { exact: true }).fill(current);
-  await p.getByRole("button", { name: "Apply", exact: true }).click();
+  await p.locator("#task-deadline").fill(current);
+  await p
+    .getByRole("button", { name: "Dismiss composer", exact: true })
+    .click();
   await p
     .getByRole("button", { name: "Due · " + taskTitle, exact: true })
     .waitFor();
@@ -154,7 +155,10 @@ export async function verifyWorkspaces(p, out) {
     .first()
     .click();
   await p.getByLabel("Project name").fill("Second project");
-  await p.getByLabel("Linked skill").fill("Robotics");
+  await p.getByText("More properties", { exact: true }).click();
+  await p
+    .getByRole("textbox", { name: "Linked skill", exact: true })
+    .fill("Robotics");
   await p.getByRole("button", { name: "Save", exact: true }).click();
   const second = (await state()).projects.find(
     (x) => x.name === "Second project",
@@ -170,8 +174,15 @@ export async function verifyWorkspaces(p, out) {
     .locator(".task-composer")
     .getByRole("button", { name: /Choose project/ })
     .click();
-  await p.getByRole("option", { name: "Second project" }).click();
-  await p.getByRole("button", { name: "Apply", exact: true }).click();
+  const projectSearch = p.getByPlaceholder("Find project");
+  await projectSearch.fill("Second");
+  await p
+    .locator(".task-detail")
+    .screenshot({ path: path.join(out, "Project-picker.png") });
+  await projectSearch.press("Enter");
+  await p
+    .getByRole("button", { name: "Dismiss composer", exact: true })
+    .click();
   await p
     .locator("#projects")
     .getByRole("button", { name: "Second project", exact: true })
@@ -258,6 +269,145 @@ export async function verifyWorkspaces(p, out) {
     });
   });
   assert(snapshot.projects.some((x) => x.id === project.id));
+  await nav("Skills");
+  const skill = p.locator(".entity-tile").filter({ hasText: "Robotics" });
+  const skillXP = await skill
+    .getByRole("progressbar")
+    .getAttribute("aria-valuenow");
+  await skill
+    .getByRole("button", { name: "Rename Robotics", exact: true })
+    .click();
+  const rename = p.getByRole("textbox", { name: "Rename skill", exact: true });
+  await rename.fill("Control systems");
+  await rename.press("Enter");
+  const renamed = p
+    .locator(".entity-tile")
+    .filter({ hasText: "Control systems" });
+  assert.equal(
+    await renamed.getByRole("progressbar").getAttribute("aria-valuenow"),
+    skillXP,
+  );
+  await renamed
+    .getByRole("button", { name: "Change image", exact: true })
+    .click();
+  await p.getByRole("button", { name: "Choose icon", exact: true }).click();
+  await p.getByPlaceholder("Search icons").fill("Code");
+  await p.getByRole("option", { name: "Code", exact: true }).click();
+  await p.reload();
+  assert.equal((await state()).skillArt["Control systems"].value, "Code");
+  await p.screenshot({ path: path.join(out, "Skills.png") });
+  const projectRow = p
+    .locator(".sidebar-project")
+    .filter({ hasText: project.name });
+  await projectRow
+    .getByRole("button", { name: "Change image", exact: true })
+    .click();
+  await p.getByRole("button", { name: "Remove image", exact: true }).click();
+  assert.equal(
+    (await state()).projects.find((x) => x.id === project.id).image,
+    "",
+  );
+  await projectRow
+    .getByRole("button", { name: "Rename " + project.name, exact: true })
+    .first()
+    .click();
+  const renameProject = p.getByRole("textbox", {
+    name: "Rename project",
+    exact: true,
+  });
+  await renameProject.fill("Robot workshop");
+  await renameProject.press("Enter");
+  await p.locator('#projects [data-key="' + project.id + '"]').click();
+  await p
+    .getByRole("heading", { name: "Robot workshop", exact: true })
+    .waitFor();
+  await nav("Habits");
+  await p.getByRole("heading", { name: "Growth", exact: true }).waitFor();
+  await p.getByRole("heading", { name: "Battle", exact: true }).waitFor();
+  await p.getByRole("button", { name: "Add bad habit", exact: true }).click();
+  await p
+    .getByRole("textbox", { name: "Name", exact: true })
+    .fill("Late scrolling");
+  await p.getByRole("button", { name: "Save", exact: true }).click();
+  const beforeBattle = Object.keys((await state()).receipts).length;
+  const battleTile = p
+    .locator(".entity-tile")
+    .filter({ hasText: "Late scrolling" });
+  await battleTile
+    .getByRole("button", { name: "Change image", exact: true })
+    .click();
+  await p.getByRole("button", { name: "Choose emoji", exact: true }).click();
+  await p.getByRole("button", { name: "🎯", exact: true }).click();
+  assert.equal((await state()).battles[0].art.value, "🎯");
+  await p.getByRole("button", { name: "Occurred", exact: true }).click();
+  await p.getByRole("button", { name: "Occurred", exact: true }).click();
+  assert.equal((await state()).battles[0].log.length, 1);
+  assert.equal(Object.keys((await state()).receipts).length, beforeBattle);
+  await p.getByRole("button", { name: "Avoided", exact: true }).click();
+  assert.equal((await state()).battles[0].log.length, 0);
+  await p.reload();
+  await p.getByText(/Avoided today/).waitFor();
+  await p.screenshot({ path: path.join(out, "Habits.png") });
+  await p.locator('#projects [data-key="' + project.id + '"]').click();
+  await p.getByRole("button", { name: "Project folder", exact: true }).click();
+  const folder = p.getByRole("textbox", { name: "Folder name" });
+  await folder.fill("Workshop");
+  await folder.press("Enter");
+  await p.keyboard.press("Escape");
+  const folderRow = p.locator(".folder-name").filter({ hasText: "Workshop" });
+  await folderRow
+    .getByRole("button", { name: "Rename Workshop", exact: true })
+    .click();
+  const folderName = p.getByRole("textbox", { name: "Rename folder" });
+  await folderName.fill("Engineering");
+  await folderName.press("Enter");
+  await p
+    .locator(".folder-name")
+    .filter({ hasText: "Engineering" })
+    .getByRole("button", { name: "Change image" })
+    .click();
+  await p.getByRole("button", { name: "Choose icon", exact: true }).click();
+  await p.getByPlaceholder("Search icons").fill("Code");
+  await p.getByRole("option", { name: "Code", exact: true }).click();
+  await p.reload();
+  assert.equal((await state()).folderArt.Engineering.value, "Code");
+  await p.locator(".ws-child").filter({ hasText: "Measure offset" }).waitFor();
+  await p.screenshot({ path: path.join(out, "Project-hierarchy.png") });
+  await p
+    .locator("#projects")
+    .screenshot({ path: path.join(out, "Project-folders.png") });
+  await nav("Planner");
+  const child = p
+    .locator(".ws-pool .ws-child")
+    .filter({ hasText: "Measure offset" });
+  await child.dragTo(p.locator(".ws-day").first(), {
+    targetPosition: { x: 20, y: 570 },
+  });
+  const childBlock = p
+    .locator(".ws-child-block")
+    .filter({ hasText: "Measure offset" });
+  await childBlock.waitFor();
+  const parentBlock = p
+    .locator(".ws-block")
+    .filter({ hasText: "Calibrate wrist joint" })
+    .first();
+  const [pb, cb] = await Promise.all([
+    parentBlock.boundingBox(),
+    childBlock.boundingBox(),
+  ]);
+  assert(
+    cb.x > pb.x &&
+      Math.abs(cb.x + cb.width - pb.x - pb.width) < 2 &&
+      cb.height < pb.height,
+  );
+  await childBlock
+    .getByRole("button", { name: "↳ Calibrate wrist joint" })
+    .click();
+  await p.getByLabel("Title", { exact: true }).waitFor();
+  await p.getByRole("button", { name: "Dismiss composer" }).click();
+  await p.reload();
+  await childBlock.waitFor();
+  await p.screenshot({ path: path.join(out, "Planner-hierarchy.png") });
   await nav("Overview");
   await none();
 }

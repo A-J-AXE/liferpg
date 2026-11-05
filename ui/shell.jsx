@@ -1,7 +1,15 @@
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "./components/ui/dropdown-menu";
+export { renderEntityWorkspace } from "./entity-workspaces";
+import { Artwork, InlineName } from "./entity-controls";
 export { workspace } from "./workspaces";
 export { backupLegacy } from "./planning-backup.mjs";
 export { plan, applyPlan } from "./planning.mjs";
-export { openComposer } from "./compact-composer";
+export { openComposer, openProjectPicker } from "./compact-composer";
 export { renderFocus } from "./compact-timer";
 export { searchTasks } from "./planner-controls";
 import React, { useEffect } from "react";
@@ -44,6 +52,7 @@ import {
   Search,
   PanelLeft,
   Layers2,
+  ChevronRight,
 } from "lucide-react";
 
 const groups = [
@@ -77,6 +86,10 @@ function Navigation({
   theme,
   onTheme,
   onProject,
+  projectChange,
+  folders,
+  folderChange,
+  readPicture,
   lists,
 }) {
   const { open, isMobile, setOpenMobile, toggleSidebar } = useSidebar();
@@ -166,14 +179,69 @@ function Navigation({
                   <div key={f}>
                     {f && (
                       <div className="folder-name">
-                        <FolderOpen size={14} />
-                        {f}
+                        <Artwork
+                          entity={{ art: folders?.[f] }}
+                          fallback={FolderOpen}
+                          read={readPicture}
+                          change={(art) => folderChange(f, { art })}
+                        />
+                        <InlineName
+                          value={f}
+                          label="Rename folder"
+                          change={(name) => folderChange(f, { name })}
+                        />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button aria-label={"Folder actions for " + f}>
+                              ⋯
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem
+                              onSelect={() => folderChange(f, { name: "" })}
+                            >
+                              Remove folder (keep projects)
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     )}
                     <SidebarMenu>
                       {projects
                         .filter((p) => (p.folder || "") === f)
-                        .map((p) => item(Folder, p.name, p.id, p.image))}
+                        .map((p) => (
+                          <SidebarMenuItem
+                            key={p.id}
+                            className="sidebar-project"
+                            data-active={view === p.id}
+                          >
+                            <Artwork
+                              entity={p}
+                              read={readPicture}
+                              change={(art) =>
+                                projectChange(p, {
+                                  art,
+                                  image: art?.kind === "image" ? art.value : "",
+                                })
+                              }
+                            />
+                            <InlineName
+                              value={p.name}
+                              label="Rename project"
+                              change={(name) => projectChange(p, { name })}
+                            />
+                            <SidebarMenuButton
+                              tooltip={"Open " + p.name}
+                              aria-label={p.name}
+                              aria-current={view === p.id ? "page" : undefined}
+                              data-act="nav"
+                              data-key={p.id}
+                              onClick={() => setOpenMobile(false)}
+                            >
+                              <ChevronRight />
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        ))}
                     </SidebarMenu>
                   </div>
                 ),

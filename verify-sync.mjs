@@ -50,14 +50,20 @@ try {
   await phone.goto(url);
   await pc.getByRole("button", { name: "New project", exact: true }).click();
   await pc.getByLabel("Project name").fill("Shared project");
+  await pc.getByText("More properties", { exact: true }).click();
   await pc.getByLabel("Linked skill").fill("Robotics");
   await pc.getByRole("button", { name: "Save", exact: true }).click();
   await phone
     .locator("#projects")
-    .getByText("Shared project")
+    .getByRole("button", { name: "Shared project", exact: true })
+    .last()
     .waitFor({ timeout: 12000 });
-  await phone.locator("#projects").getByText("Shared project").click();
-  await phone.getByRole("button",{name:"＋ Add task",exact:true}).click();
+  await phone
+    .locator("#projects")
+    .getByRole("button", { name: "Shared project", exact: true })
+    .last()
+    .click();
+  await phone.getByRole("button", { name: "＋ Add task", exact: true }).click();
   await phone.getByLabel("Title", { exact: true }).fill("Phone task");
   await phone.getByRole("button", { name: "Create", exact: true }).click();
   await pc
