@@ -68,8 +68,13 @@ try {
   });
   await click("New project");
   await p.getByLabel("Project name").fill("Robotic arm");
-  await p.getByText("More properties", { exact: true }).click();
-  await p.getByLabel("Linked skill").fill("Robotics");
+  await p.getByRole("button", { name: "Linked skill", exact: true }).click();
+  const skillInput = p.getByRole("textbox", {
+    name: "Skill name",
+    exact: true,
+  });
+  await skillInput.fill("Robotics");
+  await skillInput.press("Enter");
   const png = await p.evaluate(() => {
     const c = document.createElement("canvas");
     c.width = c.height = 100;
@@ -90,12 +95,17 @@ try {
     x.fill();
     return c.toDataURL().split(",")[1];
   });
-  await p.getByLabel("Your project image").setInputFiles({
+  await click("Change image");
+  await p.getByLabel("Upload image file").setInputFiles({
     name: "arm.png",
     mimeType: "image/png",
     buffer: Buffer.from(png, "base64"),
   });
-  await click("Save");
+  await p
+    .getByRole("dialog", { name: "New project" })
+    .locator("img.entity-art")
+    .waitFor();
+  await click("Create project");
   const out = process.env.LIFEOS_SCREENSHOTS || "screenshots";
   await mkdir(out, { recursive: true });
   async function task(title, time, priority, children = "") {

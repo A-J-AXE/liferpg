@@ -1,6 +1,7 @@
 import {
   renderEntityWorkspace,
   openComposer,
+  openProjectEditor,
   openProjectPicker,
   workspace,
   plan,
@@ -178,41 +179,42 @@ async function picture(file) {
   bm.close();
   return c.toDataURL("image/png");
 }
+function projectFolders() {
+  return [...new Set(state.projects.map((p) => p.folder).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b))
+    .map((name) => ({
+      name,
+      art: Object.hasOwn(state.folderArt || {}, name)
+        ? state.folderArt[name]
+        : null,
+    }));
+}
+function updateProject(project, changes) {
+  Object.assign(project, changes);
+  if (project.skill && !state.skills.includes(project.skill))
+    state.skills.push(project.skill);
+  save();
+}
 function projectForm(p) {
-  dialog(
-    p ? "Project properties" : "New project",
-    field("name", "Project name", "text", p?.name, "required") +
-      "<details><summary>More properties</summary>" +
-      field("folder", "Sidebar folder", "text", p?.folder) +
-      field("color", "Project color", "color", p?.color || "#74669e") +
-      select(
-        "stage",
-        "Stage",
-        ["Inbox", "In progress", "Completed"].map((v) => [v, v]),
-        p?.stage || "In progress",
-      ) +
-      field("skill", "Linked skill", "text", p?.skill) +
-      field("photo", "Your project image", "file", "", 'accept="image/*"') +
-      image(p) +
-      "</details>",
-    async (f) => {
-      const next = {
-        id: p?.id || id(),
-        name: f.name.trim(),
-        folder: f.folder.trim(),
-        color: f.color,
-        stage: f.stage,
-        skill: f.skill.trim() || "",
-        image: (await picture(f.photo)) || p?.image || "",
-      };
-      if (!next.name) throw Error("Enter a project name");
-      if (p) Object.assign(p, next);
-      else state.projects.push(next);
-      if (next.skill && !state.skills.includes(next.skill))
-        state.skills.push(next.skill);
-      view = next.id;
+  openProjectEditor({
+    initial: p || {
+      name: "",
+      folder: "",
+      color: "#74669e",
+      stage: "Inbox",
+      skill: "",
+      image: "",
     },
-  );
+    folders: projectFolders(),
+    skills: state.skills,
+    read: picture,
+    save(draft) {
+      const next = p || { id: id() };
+      if (!p) state.projects.push(next);
+      view = next.id;
+      updateProject(next, draft);
+    },
+  });
 }
 const priorities = ["None", "Low", "Medium", "High", "Goal"];
 function projectChoices() {
@@ -971,10 +973,8 @@ function render() {
       },
       assign: assignProject,
       complete,
-      projectChange: (p, changes) => {
-        Object.assign(p, changes);
-        save();
-      },
+      projectChange: updateProject,
+      folders: projectFolders(),
       readPicture: picture,
       skills: state.skills,
       pref(changes) {

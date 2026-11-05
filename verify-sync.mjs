@@ -50,9 +50,14 @@ try {
   await phone.goto(url);
   await pc.getByRole("button", { name: "New project", exact: true }).click();
   await pc.getByLabel("Project name").fill("Shared project");
-  await pc.getByText("More properties", { exact: true }).click();
-  await pc.getByLabel("Linked skill").fill("Robotics");
-  await pc.getByRole("button", { name: "Save", exact: true }).click();
+  await pc.getByRole("button", { name: "Linked skill", exact: true }).click();
+  const skillInput = pc.getByRole("textbox", {
+    name: "Skill name",
+    exact: true,
+  });
+  await skillInput.fill("Robotics");
+  await skillInput.press("Enter");
+  await pc.getByRole("button", { name: "Create project", exact: true }).click();
   await phone
     .locator("#projects")
     .getByRole("button", { name: "Shared project", exact: true })

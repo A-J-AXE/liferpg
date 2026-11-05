@@ -401,3 +401,75 @@
   height: 10px;
   border-radius: 3px;
 }
+.project-icon-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.project-icon-control {
+  width: 30px;
+  height: 30px;
+  padding: 4px;
+}
+.project-icon-control svg {
+  width: 17px;
+  height: 17px;
+}
+.project-icon-control .entity-art {
+  width: 17px;
+  height: 17px;
+}
+.project-stage-idle {
+  color: #b6404d;
+}
+.project-stage-active {
+  color: #976800;
+}
+.project-stage-done {
+  color: #207a51;
+}
+.black .project-stage-idle {
+  color: #ff8f9b;
+}
+.black .project-stage-active {
+  color: #ffcd60;
+}
+.black .project-stage-done {
+  color: #74dca1;
+}
+.project-picker {
+  display: grid;
+  gap: 5px;
+  width: 230px;
+  max-height: 50vh;
+  overflow: auto;
+}
+.project-picker > button {
+  justify-content: flex-start;
+}
+.project-picker > button[aria-pressed="true"] {
+  background: var(--tint);
+}
+.project-picker-entry,
+.project-composer-name,
+.project-composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.project-picker-entry input,
+.project-composer-name input {
+  min-width: 0;
+}
+.project-composer {
+  max-width: min(380px, calc(100% - 24px));
+  padding: 14px;
+}
+.project-composer-name {
+  margin-bottom: 8px;
+}
+.project-composer-actions {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}

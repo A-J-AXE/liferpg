@@ -1,3 +1,4 @@
+export { openProjectEditor } from "./project-controls";
 import {
   DropdownMenu,
   DropdownMenuTrigger,

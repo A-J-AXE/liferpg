@@ -155,11 +155,14 @@ export async function verifyWorkspaces(p, out) {
     .first()
     .click();
   await p.getByLabel("Project name").fill("Second project");
-  await p.getByText("More properties", { exact: true }).click();
-  await p
-    .getByRole("textbox", { name: "Linked skill", exact: true })
-    .fill("Robotics");
-  await p.getByRole("button", { name: "Save", exact: true }).click();
+  await p.getByRole("button", { name: "Linked skill", exact: true }).click();
+  const skillInput = p.getByRole("textbox", {
+    name: "Skill name",
+    exact: true,
+  });
+  await skillInput.fill("Robotics");
+  await skillInput.press("Enter");
+  await p.getByRole("button", { name: "Create project", exact: true }).click();
   const second = (await state()).projects.find(
     (x) => x.name === "Second project",
   );
