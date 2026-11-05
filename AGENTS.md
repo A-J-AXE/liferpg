@@ -1,14 +1,25 @@
-# Frontend work in LifeOS
+# LifeOS clean frontend rebuild — governing instructions
 
-For the RPG Overview, read the project-local UI UX Pro Max and Frontend UI Engineering skills, plus docs/COMPONENT_SOURCES.md and docs/VISUAL_ACCEPTANCE.md. Keep the character, destination grid and journal distinct. Exercise the isolated RPG playground before changing production behavior. Keep reward feedback tied to real receipts and respect reduced motion.
+The current implementation is an authorized clean rebuild. **All old frontend components and styles are replaceable/deleteable.** No demo/test data must survive. Preserve the Git history and do not delete remote branches, hosted accounts, infrastructure or credentials. Never merge or deploy publicly without explicit user authorization.
 
-1. Read `docs/DESIGN_SYSTEM.md` and the project skill at `.agents/skills/shadcn/SKILL.md` before frontend changes.
-2. Inspect `components.json`, `ui/components/ui/`, and existing compositions first.
-3. When a component is needed, search the official `@shadcn` registry using the shadcn MCP server and inspect the relevant item. If the server is unavailable, report that and restore it; do not quietly improvise a replacement.
-4. Reuse installed components whenever available.
-5. Add missing official components from the repository root with `npx shadcn@latest add @shadcn/<name>`. Review changes and retain upstream notices. Never overwrite local adaptations silently.
-6. Style through the approved semantic theme tokens. Use the shared primitives in both the product and the showcase.
-7. Do not implement a homemade equivalent. Document a justified exception, the registry search, and the affected surfaces in the design system before shipping a custom control.
-8. Preserve the design language across screens. Keep the full native openGym experience intact. Build, typecheck, and verify the affected interaction in Light and Black, with keyboard and a narrow viewport.
+## Start here
+1. `docs/rebuild/REBUILD-DECISIONS.md` — staged deletions and milestones
+2. `docs/rebuild/component-source-map.md` — pinned, inspected GitHub source and licenses
+3. `docs/rebuild/asset-manifest.md` — exact genuine 3D art paths; imports are still pending
+4. `docs/rebuild/visual-reference-matrix.md` — screenshot-based acceptance
+5. `docs/rebuild/reward-v3.1-contract.md` — **most important functional contract**, 51 tests
+6. `docs/rebuild/INSTALLATION.md` — Codex skills and conflicts
+7. `.agents/skills/lifeos-template-first-frontend/SKILL.md` — project-specific sourcing process
 
-For planner interactions, read `docs/INTERACTION_PATTERNS.md`, `docs/UI_REFERENCE.md`, `docs/UI_ACCEPTANCE_CHECKLIST.md` and `.agents/skills/compact-desktop-ui/SKILL.md` before editing. Use the actual reference PNGs. Validate real keyboard, touch and persistence behavior. The approved workspace restructure extends these patterns to Inbox, Upcoming, Planner and project task lists. Read docs/planner-view-architecture.md, docs/task-planning-data-model.md and docs/akiflow-interaction-reference.md. Mount the hourly timeline only in Planner. Use task boards for Upcoming Overview/Day/Week/Month, project-scoped task lists for projects and 1–7 days for Planner. Preserve task identity, planning precision and existing data. Exercise actual navigation, scheduling and cross-view persistence before shipping.
+## Scope
+- Current PR 00: source lock only. Don't modify app code in this PR. Next PR 01 deletes and replaces old string-generated frontend once the new React shell has actual screenshot/test evidence.
+- PR 01–06: frontend/UI-only with clearly labeled DEMO fixtures, not earned money or promises of real sync.
+- PR 07–13: v3.1 economy, quests, deterministic allocation, ledger, Finish, Undo and all golden tests.
+- PR 14–22: connect live transactions, OpenGym, Google Calendar, desktop/browser sync and release QA.
+
+## Hard constraints
+- Use real licensed GitHub source/art, with pinned SHA/exact path/provenance. No AI-generated 3D icons, fabricated SVG art or unattributed source.
+- Compact, keyboard-accessible real product UI. RPG home uses character / destinations / activity; Planner is dense with an hourly timeline; Upcoming uses task boards; OpenGym retains full workout flows.
+- Taste Skill is critique guidance, not a landing-page architecture. Minimalist UI may not forbid small Lucide actions required by LifeOS.
+- No duplicate currency creation. Exact v3.1 reward snapshots and ledger are sole authorities once wired; visual animations can never award coins.
+- Work on only one draft stacked PR at a time, run verification, capture screenshots, record deviations and stop.
