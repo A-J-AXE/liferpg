@@ -45,6 +45,7 @@ http
     }
     try {
       const data = await readFile(new URL(name, import.meta.url));
+      res.setHeader("Cache-Control", "no-cache");
       res.setHeader(
         "Content-Type",
         name.endsWith("js")

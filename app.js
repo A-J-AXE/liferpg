@@ -9,6 +9,7 @@ import {
   renderFocus,
   searchTasks,
   renderSidebar,
+  renderRpg,
 } from "/shell.js";
 const $ = (s) => document.querySelector(s);
 const safe = (v) =>
@@ -368,6 +369,8 @@ function complete(t, refresh = render) {
   if (t.done)
     state.receipts[t.id] = {
       title: t.title,
+      kind: "Task",
+      at: new Date().toISOString(),
       skill: project(t.project)?.skill || "",
       xp: state.config?.xp ?? 25,
       coins: state.config?.coins ?? 4,
@@ -450,7 +453,7 @@ function agenda() {
   let tasks = state.tasks
     .filter(inList)
     .filter((t) =>
-      listFilters.includes(view)
+      listFilters.includes(view) || view === "Completed tasks"
         ? true
         : p
           ? t.project === p.id
@@ -464,7 +467,9 @@ function agenda() {
     '<div class="card"><div class="bar"><h2>' +
     safe(p?.name || "Agenda") +
     "</h2>" +
-    button("＋ Add task", "add") +
+    (["Done", "Completed tasks"].includes(view)
+      ? ""
+      : button("＋ Add task", "add")) +
     "</div>" +
     (p
       ? image(p) +
@@ -474,7 +479,7 @@ function agenda() {
         " " +
         button("Edit project", "project", p.id)
       : "") +
-    [false, true]
+    (["Done", "Completed tasks"].includes(view) ? [true] : [false])
       .map((done) => {
         let group = tasks.filter((t) => t.done === done);
         return (
@@ -490,7 +495,9 @@ function agenda() {
       })
       .join("") +
     (!tasks.length
-      ? "<p>Capture a task and give it a place in your day.</p>"
+      ? ["Done", "Completed tasks"].includes(view)
+        ? "<p>Completed tasks will appear here.</p>"
+        : "<p>Capture a task and give it a place in your day.</p>"
       : "") +
     "</div>"
   );
@@ -690,6 +697,183 @@ function entityContext() {
     },
   };
 }
+const playground = {
+  name: "Trailkeeper",
+  xp: 85,
+  coins: 24,
+  hp: 98,
+  limit: 100,
+  objective: "Finish the trail journal",
+  skills: [
+    { name: "Exploration", xp: 85 },
+    { name: "Training", xp: 30 },
+  ],
+  habits: [{ id: "demo", title: "Walk outside", checked: false }],
+  battles: [{ id: "demo-b", name: "Late scrolling" }],
+  events: [],
+};
+function homeData(ctx) {
+  const habitsByKey = new Map(state.habits.map((h) => [h.id + now, h]));
+  const events = Object.entries(state.receipts).map(([id, r]) => ({
+    ...r,
+    id,
+    at: r.at || r.date,
+    kind:
+      r.kind ||
+      (id.startsWith("gym:")
+        ? "Workout"
+        : habitsByKey.has(id)
+          ? "Growth"
+          : "Reward"),
+    route: id.startsWith("gym:") ? "openGym" : undefined,
+  }));
+  for (const r of state.rewardHistory || [])
+    events.push({
+      ...r,
+      id: "spent:" + r.id,
+      coins: 0,
+      kind: "Redeemed · " + r.coins + " coins",
+      route: "Market",
+    });
+  for (const b of state.battles || [])
+    for (const [date, outcome] of Object.entries(b.daily || {}))
+      events.push({
+        id: "battle:" + b.id + date,
+        title: b.name,
+        at: date,
+        kind: outcome === "avoided" ? "Battle · Avoided" : "Battle · Occurred",
+        route: "Battle",
+      });
+  for (const date of Object.keys(state.diary))
+    events.push({
+      id: "diary:" + date,
+      title: "Reflection saved",
+      at: date,
+      kind: "Journal",
+      route: "Diary",
+    });
+  return {
+    ...ctx,
+    name: state.profile,
+    avatar:
+      state.config?.avatarArt ||
+      (state.config?.portrait
+        ? { kind: "image", value: state.config.portrait }
+        : null),
+    xp: total("xp"),
+    coins: total("coins") - state.spent,
+    hp: Math.max(
+      0,
+      100 - (state.battles || []).reduce((n, b) => n + (b.log?.length || 0), 0),
+    ),
+    objective: state.config?.objective,
+    events: events
+      .sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0))
+      .slice(0, 16),
+  };
+}
+function home() {
+  const screen = $("#screen"),
+    demo = view === "Dashboard playground",
+    ctx = entityContext();
+  if (!screen.querySelector("#rpg-root"))
+    screen.innerHTML =
+      '<div class="hero rpg-hero"><small>PERSONAL WORKSPACE</small><h1></h1></div><div id="rpg-root"></div>';
+  screen.querySelector("h1").textContent = demo
+    ? "Dashboard playground"
+    : "Overview";
+  const go = (target, icon) => {
+    if (demo) return;
+    if (target === "Focus") {
+      const btn = document.querySelector("#timer button");
+      btn?.focus();
+      return;
+    }
+    view =
+      target === "habits" ? (icon === "Battle" ? "Battle" : "Habits") : target;
+    render();
+    if (icon === "Battle")
+      requestAnimationFrame(() =>
+        Array.from(document.querySelectorAll("#entity-workspace h2"))
+          .find((e) => e.textContent === "Battle")
+          ?.scrollIntoView({ block: "nearest" }),
+      );
+  };
+  const act = demo
+    ? {
+        go,
+        read: picture,
+        name(name) {
+          playground.name = name;
+          home();
+        },
+        avatar(avatar) {
+          playground.avatar = avatar;
+          home();
+        },
+        check() {
+          const h = playground.habits[0];
+          h.checked = !h.checked;
+          playground.xp += h.checked ? 15 : -15;
+          playground.coins += h.checked ? 2 : -2;
+          playground.events = h.checked
+            ? [
+                {
+                  id: "demo-event",
+                  title: h.title,
+                  kind: "Growth",
+                  xp: 15,
+                  coins: 2,
+                  at: new Date().toISOString(),
+                },
+              ]
+            : [];
+          home();
+        },
+        battle(h, status) {
+          h.status = status;
+          home();
+        },
+      }
+    : {
+        go,
+        read: picture,
+        name(name) {
+          state.profile = name;
+          save();
+        },
+        avatar(art) {
+          const config = (state.config ||= {});
+          config.avatarArt = art;
+          config.portrait = art?.kind === "image" ? art.value : "";
+          save();
+        },
+        check(id) {
+          checkGrowth(id);
+        },
+        battle: ctx.battleStatus,
+      };
+  renderRpg($("#rpg-root"), demo ? { ...playground } : homeData(ctx), act);
+  tick();
+}
+function checkGrowth(id) {
+  const h = state.habits.find((h) => h.id === id);
+  if (!h) return;
+  const key = id + now;
+  if (state.receipts[key]) delete state.receipts[key];
+  else {
+    state.receipts[key] = {
+      title: h.title,
+      skill: h.skill,
+      kind: "Growth",
+      at: new Date().toISOString(),
+      xp: 10,
+      coins: 2,
+    };
+    feedback();
+  }
+  save();
+}
 function render() {
   if (view !== previousView) {
     if (previousView && viewFromUrl() !== view)
@@ -739,6 +923,10 @@ function render() {
     lists: listFilters,
   });
   document.documentElement.dataset.effects = state.config?.effect || "on";
+  if (["Overview", "Dashboard playground"].includes(view)) {
+    home();
+    return;
+  }
   if (["Skills", "Habits", "Battle"].includes(view)) {
     const screen = $("#screen");
     if (!screen.querySelector("#entity-workspace"))
@@ -885,11 +1073,30 @@ function render() {
   else if (view === "Settings")
     body =
       button("Edit profile", "profile") +
-      '<p><a href="/design-system">UI showcase</a></p>' +
+      '<p><a href="/design-system">UI showcase</a> · <a href="/#Dashboard%20playground">RPG playground</a></p>' +
       settingsPlus() +
       googleSettings() +
       availabilityPanel() +
       mcpPanel();
+  else if (view === "Vault")
+    body =
+      '<div class="card"><h2>' +
+      (total("coins") - state.spent) +
+      " coins available</h2><p>" +
+      total("coins") +
+      " earned · " +
+      state.spent +
+      " spent</p>" +
+      button("Open Marketplace", "nav", "Market") +
+      button("Activity journal", "nav", "Journal") +
+      (state.rewardHistory || [])
+        .slice()
+        .reverse()
+        .map(
+          (r) => "<p>" + safe(r.title) + " · " + safe(r.coins) + " coins</p>",
+        )
+        .join("") +
+      "</div>";
   else if (view === "Market")
     body =
       button("Create reward", "reward") +
@@ -993,20 +1200,9 @@ document.addEventListener("click", (e) => {
         (f) => state.habits.push({ ...f, id: id() }),
       );
       break;
-    case "check": {
-      let h = state.habits.find((h) => h.id === k),
-        key = k + now;
-      if (state.receipts[key]) delete state.receipts[key];
-      else
-        state.receipts[key] = {
-          title: h.title,
-          skill: h.skill,
-          xp: 10,
-          coins: 2,
-        };
-      save();
+    case "check":
+      checkGrowth(k);
       break;
-    }
     case "reward":
       dialog(
         "Personal reward",
@@ -1019,6 +1215,12 @@ document.addEventListener("click", (e) => {
       let r = state.shop.find((r) => r.id === k);
       if (total("coins") - state.spent >= r.cost) {
         state.spent += Number(r.cost);
+        (state.rewardHistory ||= []).push({
+          id: id(),
+          title: r.title,
+          coins: Number(r.cost),
+          at: new Date().toISOString(),
+        });
         save();
       } else alert("Earn more coins to redeem this reward.");
       break;
@@ -1710,7 +1912,8 @@ function inList(t) {
   if (view === "Tomorrow") return t.date === day(tomorrow);
   if (view === "Upcoming") return t.date > now;
   if (view === "Someday") return plan(t).kind === "someday" && !t.done;
-  if (view === "Done") return t.done;
+  if (view === "Done" || view === "Completed tasks") return t.done;
+  if (t.done) return false;
   if (view === "This Month")
     return plan(t).value?.slice(0, 7) === now.slice(0, 7);
   if (view === "This Week" || view === "Next 7 Days") {

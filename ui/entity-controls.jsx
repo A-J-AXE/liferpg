@@ -46,9 +46,16 @@ const icons = {
 };
 export function Identity({ entity, fallback: Fallback = Folder }) {
   const art = entity?.art;
-  if (art?.kind === "image" || (!art && entity?.image))
+  const [failed, setFailed] = useState(null);
+  const src = art?.kind === "image" ? art.value : !art ? entity?.image : null;
+  if (src && failed !== src)
     return (
-      <img className="entity-art" alt="" src={art?.value || entity.image} />
+      <img
+        className="entity-art"
+        alt=""
+        src={src}
+        onError={() => setFailed(src)}
+      />
     );
   if (art?.kind === "emoji") return <span aria-hidden>{art.value}</span>;
   const Icon = icons[art?.value] || Fallback;

@@ -1,0 +1,6 @@
+# RPG dashboard sources
+- Project-local design skills: [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) and [Frontend UI Engineering](https://github.com/addyosmani/agent-skills/tree/main/skills/frontend-ui-engineering). Install from these upstream sources when missing. The skills guide the work and are not application dependencies.
+- [3dicons](https://github.com/realvjy/3dicons) documents CC0 rendered illustrations in multiple styles and angles. The shipped LifeOS dashboard uses original inline SVG paths with a consistent two-layer treatment. No third-party illustrations are bundled or hotlinked.
+- [dashboardcn](https://dashboardcn.com/docs) provides activity, distribution and metric components. The character sheet uses the installed shadcn Progress and Button plus the existing LifeOS artwork and inline edit controls.
+- [life-rpg](https://github.com/gxxnja/life-rpg) and [LevelUp](https://github.com/Ashawn0/LevelUp) are references for progression and habits. Existing LifeOS records remain authoritative.
+- [Motion Primitives](https://github.com/ibelick/motion-primitives) and [Motion](https://github.com/motiondivision/motion) informed the short, event-led feedback. This screen uses CSS for one-shot feedback and respects reduced motion.

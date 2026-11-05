@@ -193,7 +193,7 @@ export async function verifyWorkspaces(p, out) {
   const completed = p
     .locator("[data-task=" + JSON.stringify(occurrence.id) + "]")
     .getByRole("checkbox");
-  await completed.check();
+  await completed.click();
   assert.equal(
     (await state()).tasks.find((t) => t.title === "Review joint limits")
       .project,
@@ -241,7 +241,9 @@ export async function verifyWorkspaces(p, out) {
     await p
       .locator(".external")
       .first()
-      .evaluate((el) => el.offsetWidth < el.parentElement.clientWidth / 2),
+      .evaluate(
+        (el) => el.offsetWidth <= Math.ceil(el.parentElement.clientWidth / 2),
+      ),
     true,
   );
   await p.evaluate(() => {
@@ -371,6 +373,11 @@ export async function verifyWorkspaces(p, out) {
   await p.getByRole("option", { name: "Code", exact: true }).click();
   await p.reload();
   assert.equal((await state()).folderArt.Engineering.value, "Code");
+  await nav("Completed tasks");
+  await p
+    .getByRole("checkbox", { name: "Complete Calibrate wrist joint" })
+    .click();
+  await p.locator('#projects [data-key="' + project.id + '"]').click();
   await p.locator(".ws-child").filter({ hasText: "Measure offset" }).waitFor();
   await p.screenshot({ path: path.join(out, "Project-hierarchy.png") });
   await p

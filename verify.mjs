@@ -50,7 +50,19 @@ try {
   const click = (t) => p.getByRole("button", { name: t, exact: true }).click();
   const nav = (t) =>
     p.locator("#nav").getByRole("button", { name: t, exact: true }).click();
-  await p.goto("http://127.0.0.1:4310");
+  await p.goto("http://127.0.0.1:4310/#Dashboard%20playground");
+  await p
+    .locator(".rpg-home")
+    .getByRole("button", { name: "Check in", exact: true })
+    .click();
+  await p
+    .locator(".rpg-home")
+    .getByRole("status")
+    .getByText(/Level up/)
+    .waitFor();
+  assert.equal(await p.evaluate(() => localStorage.getItem("lifeos")), null);
+  await p.goto("http://127.0.0.1:4310/");
+  await p.reload();
   await p.evaluate(async () => {
     await import("/app.js");
   });
@@ -121,9 +133,12 @@ try {
   const done = p.getByRole("checkbox", {
     name: "Complete Calibrate wrist joint",
   });
-  await done.check();
-  await done.uncheck();
-  await done.check();
+  await done.click();
+  assert.equal(await done.count(), 0);
+  await nav("Completed tasks");
+  await done.click();
+  await nav("Today");
+  await done.click();
   await p.reload();
   let st = await p.evaluate(() => JSON.parse(localStorage.lifeos));
   assert.equal(Object.keys(st.receipts).length, 1);
@@ -235,31 +250,29 @@ try {
     "35",
   );
   assert(await p.locator("#projects img").isVisible());
-  // XP uses a short fill on a gain, and the same numeric change without motion when requested.
-  const wrist = p.getByRole("checkbox", {
-    name: "Complete Calibrate wrist joint",
-  });
-  const character = p.getByRole("progressbar", { name: "Character progress" });
-  await wrist.uncheck();
-  await wrist.check();
-  assert(
-    await character
-      .locator("[data-slot=progress-indicator]")
-      .evaluate((el) =>
-        el.getAnimations().some((a) => a.effect.getTiming().duration === 360),
-      ),
-  );
+  const home = p.locator(".rpg-home");
   await p.emulateMedia({ reducedMotion: "reduce" });
-  await wrist.uncheck();
-  await wrist.check();
-  assert.equal(await character.getAttribute("aria-valuenow"), "35");
+  await home.getByRole("button", { name: "Undo check-in" }).click();
+  await home.getByRole("button", { name: "Check in", exact: true }).click();
+  await home.getByRole("status").getByText(/10 XP/).waitFor();
+  await p.screenshot({ path: path.join(out, "Reward-feedback.png") });
   assert.equal(
-    await character
-      .locator("[data-slot=progress-indicator]")
-      .evaluate((el) => el.getAnimations().length),
+    await home.getByRole("status").evaluate((el) => el.getAnimations().length),
     0,
   );
   await p.emulateMedia({ reducedMotion: "no-preference" });
+  await home.getByRole("button", { name: "Change image" }).click();
+  await p.screenshot({ path: path.join(out, "Avatar-picker.png") });
+  await p.getByLabel("Upload image file").setInputFiles({
+    name: "portrait.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(png, "base64"),
+  });
+  await home.locator(".rpg-portrait img").waitFor();
+  await p.reload();
+  await home.locator(".rpg-portrait img").waitFor();
+  await home.getByRole("button", { name: "Coin vault", exact: true }).click();
+  await p.getByRole("heading", { name: "Vault", exact: true }).waitFor();
   await nav("Planner");
   const halfHour = p
     .locator(".ws-block")
@@ -314,6 +327,15 @@ try {
   await p.setViewportSize({ width: 1320, height: 960 });
   await nav("Overview");
   await p.screenshot({ path: path.join(out, "LifeOS-Overview-Black.png") });
+  await p.setViewportSize({ width: 610, height: 820 });
+  assert(
+    await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+  );
+  await p.screenshot({
+    path: path.join(out, "RPG-narrow.png"),
+    fullPage: true,
+  });
+  await p.setViewportSize({ width: 1320, height: 960 });
   await click("Link a task");
   await p.getByPlaceholder("Find a task to focus on").fill("Review joint");
   await p.keyboard.press("Enter");

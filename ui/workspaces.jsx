@@ -400,7 +400,7 @@ function Upcoming({ ctx }) {
       >
         {cols.map((c, i) => {
           const tasks = ctx.tasks.filter(
-            (t) => !t.trashed && bucket(t, cols) === i,
+            (t) => !t.trashed && !t.done && bucket(t, cols) === i,
           );
           return (
             <section
@@ -449,7 +449,7 @@ function Upcoming({ ctx }) {
 const priorities = ["Goal", "High", "Medium", "Low", "None"];
 function List({ ctx, project }) {
   const [group, groupBy] = useState("Status"),
-    [filter, filterBy] = useState("All"),
+    [filter, filterBy] = useState("Open"),
     [sort, sortBy] = useState("Planned date");
   const all = ctx.tasks.filter(
     (t) =>
@@ -647,7 +647,7 @@ function Planner({ ctx }) {
           <Task key={t.id} t={t} ctx={ctx} />
         ))}
         {ctx.tasks
-          .filter((t) => t.time && !t.trashed)
+          .filter((t) => t.time && !t.trashed && !t.done)
           .flatMap(subTasks)
           .filter((child) => !child.time && !child.done)
           .map((child) => (
@@ -809,7 +809,14 @@ function Planner({ ctx }) {
                 ...ctx.tasks,
                 ...ctx.tasks.filter((t) => !t.trashed).flatMap(subTasks),
               ]
-                .filter((t) => t.date === d && t.time && !t.trashed)
+                .filter(
+                  (t) =>
+                    t.date === d &&
+                    t.time &&
+                    !t.trashed &&
+                    !t.done &&
+                    !t.parent?.done,
+                )
                 .map((t) => ({
                   t,
                   at: minute(t.time),
