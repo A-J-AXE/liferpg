@@ -57,9 +57,9 @@ try {
     .getByText("Shared project")
     .waitFor({ timeout: 12000 });
   await phone.locator("#projects").getByText("Shared project").click();
-  await phone.getByText("＋ Add task").click();
+  await phone.getByRole("button",{name:"＋ Add task",exact:true}).click();
   await phone.getByLabel("Title", { exact: true }).fill("Phone task");
-  await phone.getByRole("button", { name: "Save", exact: true }).click();
+  await phone.getByRole("button", { name: "Create", exact: true }).click();
   await pc
     .getByRole("button", { name: "Phone task", exact: true })
     .waitFor({ timeout: 12000 });

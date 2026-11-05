@@ -2,9 +2,12 @@
 
 Use Node 24. From the repository root run:
 
+    npm ci
     npm ci --prefix fitness/api
     npm ci --prefix fitness/frontend
     npm start
+
+Overview is the landing page. Open Planner for hourly scheduling, Upcoming for period boards, and a project for its tasks. Press C to capture a task or Ctrl/Cmd+K to search tasks and workspace actions. The [workspace guide](docs/planner-view-architecture.md) describes period navigation and keyboard controls.
 
 Open http://127.0.0.1:4310 in the same browser profile each time. The planner stores project images, tasks, receipts and diary entries in that profile. The launcher also runs openGym at port 5173 and its API at port 3000. The openGym sidebar opens the native application. Select its guest option or connect your openGym account.
 

@@ -13,6 +13,10 @@ The v5 planner desk is the reference: agenda and calendar first, personal progre
 
 **Component source:** `components.json` selects the official shadcn Radix registry. CLI-installed source lives in `ui/components/ui`. LifeOS colors and typography feed Tailwind through `ui/theme.css`; theme values are defined in `style.css`. See the [registry](https://ui.shadcn.com/docs/components) and [MIT notice](https://github.com/shadcn-ui/ui/blob/main/LICENSE.md).
 
-**Exceptions and migration:** The time-blocking grid is a domain interaction (minute placement, overlap lanes and task drops); the registry Calendar is for date selection. Native openGym owns its screens. Existing vanilla planner forms and the native task editor remain until each can be migrated with its save, focus and keyboard behavior verified. They are not templates for new controls.
+**Exceptions and migration:** The time-blocking grid is a domain interaction (minute placement, overlap lanes and task drops); the registry Calendar is for date selection. Native openGym owns its screens. Older settings and project forms remain until each can be migrated with its save, focus and keyboard behavior verified. They are not templates for new controls.
 
 **Verification:** Run `npm run build:ui`, `npm run typecheck` and `npm run verify`. Start with `npm start` and open `/design-system` to exercise the components. Change themes in the application and revisit the showcase to see the same tokens.
+
+**Compact desktop pilot.** The production task composer and timer use local actions with progressive disclosure. Follow [interaction patterns](INTERACTION_PATTERNS.md), compare the [actual visual references](UI_REFERENCE.md), and review the [acceptance checklist](UI_ACCEPTANCE_CHECKLIST.md). The existing Project Studio remains a future migration.
+
+See [workspace architecture](planner-view-architecture.md) for the dedicated Planner and task-board layouts.

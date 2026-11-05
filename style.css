@@ -988,47 +988,6 @@
     background: transparent;
     box-shadow: none;
   }
-  .task-editor {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px 12px;
-  }
-  .task-editor > * {
-    min-width: 0;
-  }
-  .task-editor h2,
-  .task-editor > .bar,
-  .task-editor label:has(textarea),
-  .task-editor label:has([name="title"]),
-  .task-editor label:has([type="file"]) {
-    grid-column: 1/-1;
-  }
-  .task-editor label {
-    font-size: 12px;
-    color: var(--muted);
-    margin: 0;
-  }
-  .task-editor input,
-  .task-editor select,
-  .task-editor textarea {
-    min-width: 0;
-    color: var(--ink);
-    width: 100%;
-  }
-  .task-editor textarea {
-    min-height: 47px;
-  }
-  .task-editor .bar {
-    position: sticky;
-    bottom: -23px;
-    background: var(--panel);
-    padding: 10px 0;
-    justify-content: flex-end;
-  }
-  .task-editor .bar button:last-child {
-    background: var(--accent);
-    color: var(--panel);
-  }
   @media (max-width: 920px) {
     .desk .summary {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1272,12 +1231,261 @@ aside [data-slot="sidebar-header"] {
 .time-block {
   line-height: 1.15;
 }
-task-date-picker {
-  display: flex;
-  align-self: end;
-}
+
 [cmdk-item] small {
   margin-left: auto;
   color: var(--muted);
   letter-spacing: 0;
+}
+/* Review prototypes: local composer over the task list and one pinned focus strip. */
+main > header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  min-height: 48px;
+  background: var(--bg);
+  padding: 6px 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+}
+#timer {
+  grid-column: 2;
+  min-width: 0;
+}
+.focus-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 34px;
+  max-width: 100%;
+  padding: 2px 3px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.focus-control.is-expanded {
+  position: fixed;
+  top: 64px;
+  right: clamp(12px, 4vw, 60px);
+  height: 42px;
+  width: min(430px, calc(100vw - 24px));
+  box-shadow: 0 4px 18px #0002;
+  border-color: var(--accent);
+}
+.focus-control.is-expanded .timer-link {
+  flex: 1;
+  max-width: none;
+}
+.focus-control > button,
+.composer-tools button,
+.composer-top button,
+.timer-options button {
+  min-width: 26px;
+}
+.focus-control > button:first-child {
+  margin: 0 1px;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: var(--tint);
+  color: var(--accent);
+}
+.clock-readout {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  padding: 2px 5px;
+}
+.clock-readout span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.clock-readout b {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.focus-control .timer-link {
+  max-width: 170px;
+  justify-content: flex-start;
+  border-inline-start: 1px solid var(--line);
+  border-radius: 0;
+}
+.timer-link span,
+.composer-tools button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timer-picker {
+  width: min(294px, calc(100vw - 20px));
+  padding: 6px;
+}
+.timer-options {
+  width: min(285px, calc(100vw - 20px));
+  padding: 10px;
+}
+.timer-options form,
+.timer-options > div,
+.compact-choices,
+.file-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.timer-options form {
+  margin: 9px 0;
+  padding: 8px 0;
+  border-block: 1px solid var(--line);
+}
+.timer-options form input {
+  width: 62px;
+}
+.timer-options form label {
+  margin-right: auto;
+}
+.task-composer {
+  width: min(390px, calc(100vw - 20px));
+  padding: 0;
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: 9px;
+  border-color: var(--line);
+  box-shadow: 0 5px 24px #0002;
+  max-height: min(70vh, var(--radix-popover-content-available-height));
+  overflow-y: auto;
+}
+.composer-top,
+.composer-title,
+.composer-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 9px;
+}
+.composer-top {
+  border-bottom: 1px solid var(--line);
+}
+.composer-top > button:first-child {
+  margin-right: auto;
+  background: var(--bg);
+  font-size: 12px;
+}
+.composer-top > button:not(:first-child) {
+  width: 28px;
+  height: 28px;
+}
+.composer-top button svg,
+.composer-tools button svg {
+  width: 15px;
+  height: 15px;
+}
+.composer-title input {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 16px;
+  font-weight: 550;
+  height: 34px;
+  padding: 4px 3px;
+}
+.composer-title input:focus-visible {
+  box-shadow: none;
+  outline: 0;
+}
+.composer-tools {
+  padding-top: 3px;
+  padding-bottom: 8px;
+}
+.composer-tools button:first-child {
+  max-width: 55%;
+}
+.composer-tools button:last-child {
+  margin-left: auto;
+}
+.composer-tools .thumb {
+  width: 17px;
+  height: 17px;
+}
+.composer-detail {
+  padding: 9px;
+  border-top: 1px solid var(--line);
+}
+.composer-detail > button:first-child {
+  margin-bottom: 5px;
+}
+.composer-detail label,
+.timer-options label {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+.composer-detail textarea {
+  min-height: 64px;
+}
+.compact-pair,
+.option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.option-grid button {
+  justify-content: flex-start;
+}
+.file-tools a {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.task-composer [role="alert"] {
+  margin: 3px 10px 9px;
+  color: var(--high);
+  font-size: 12px;
+}
+.task-composer [data-priority="High"] svg {
+  color: var(--high);
+}
+.task-composer [data-priority="Low"] svg {
+  color: var(--low);
+}
+.task-composer [data-priority="Medium"] svg {
+  color: var(--medium);
+}
+.task-composer [data-priority="Goal"] svg {
+  color: var(--accent);
+}
+@media (max-width: 680px) {
+  main > header {
+    display: flex;
+    justify-content: flex-end;
+    position: sticky;
+  }
+  main > header > small {
+    display: none;
+  }
+  .focus-control .timer-link {
+    max-width: 118px;
+  }
+  .focus-control.is-expanded {
+    top: 8px;
+    right: 8px;
+  }
+}
+.task-composer button[data-variant="ghost"],
+.focus-control button[data-variant="ghost"],
+.timer-options button[data-variant="ghost"] {
+  border-color: transparent;
+  background: transparent;
+}
+.focus-control > button:first-child[data-variant="ghost"] {
+  background: var(--tint);
+}
+.task-composer button[data-variant="ghost"]:hover,
+.focus-control button[data-variant="ghost"]:hover,
+.timer-options button[data-variant="ghost"]:hover {
+  background: var(--tint);
 }

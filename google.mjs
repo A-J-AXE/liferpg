@@ -173,7 +173,14 @@ export async function calendarAPI(req, res, url) {
         );
         if (!r.ok) throw Error("Could not list calendars");
         const b = await r.json();
-        list.push(...b.items.map((v) => ({ id: v.id, name: v.summary })));
+        list.push(
+          ...b.items.map((v) => ({
+            id: v.id,
+            name: v.summary,
+            color: v.backgroundColor,
+            access: v.accessRole,
+          })),
+        );
         page = b.nextPageToken;
       } while (page);
       return json({ connected: true, list });
@@ -181,6 +188,46 @@ export async function calendarAPI(req, res, url) {
     if (p === "/google/events") {
       const id = url.searchParams.get("id");
       if (!id) return json({ error: "Missing calendar" }, 400);
+      const from = url.searchParams.get("from"),
+        to = url.searchParams.get("to");
+      if (from || to) {
+        const duration = Date.parse(to) - Date.parse(from);
+        if (
+          !Number.isFinite(duration) ||
+          duration <= 0 ||
+          duration > 9 * 86400000
+        )
+          return json({ error: "Invalid calendar range" }, 400);
+        const events = new Map();
+        let pageToken;
+        do {
+          const query = {
+            singleEvents: "true",
+            timeMin: from,
+            timeMax: to,
+            ...(pageToken ? { pageToken } : {}),
+          };
+          const response = await google(
+            session,
+            "calendars/" + encodeURIComponent(id) + "/events",
+            query,
+          );
+          if (!response.ok)
+            return json({ error: "Calendar unavailable" }, response.status);
+          const data = await response.json();
+          for (const e of data.items || [])
+            if (e.status !== "cancelled")
+              events.set(e.id, {
+                id: e.id,
+                title: e.summary || "Busy",
+                lifeosId: e.extendedProperties?.private?.lifeosId,
+                start: e.start?.dateTime || e.start?.date,
+                end: e.end?.dateTime || e.end?.date,
+              });
+          pageToken = data.nextPageToken;
+        } while (pageToken);
+        return json({ events: [...events.values()] });
+      }
       let old = session.calendars.get(id),
         page,
         rows = new Map(old?.rows);
@@ -205,6 +252,8 @@ export async function calendarAPI(req, res, url) {
           if (e.status === "cancelled") rows.delete(e.id);
           else
             rows.set(e.id, {
+              id: e.id,
+              lifeosId: e.extendedProperties?.private?.lifeosId,
               title: e.summary,
               start: e.start?.dateTime || e.start?.date,
               end: e.end?.dateTime || e.end?.date,

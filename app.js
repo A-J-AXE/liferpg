@@ -1,4 +1,13 @@
-import { searchTasks, renderSidebar } from "/shell.js";
+import {
+  openComposer,
+  workspace,
+  plan,
+  applyPlan,
+  backupLegacy,
+  renderFocus,
+  searchTasks,
+  renderSidebar,
+} from "/shell.js";
 const $ = (s) => document.querySelector(s);
 const safe = (v) =>
   String(v ?? "").replace(
@@ -37,7 +46,14 @@ const gymURL = window.lifeosHosted
 let view =
     location.pathname === "/design-system" ? "Design system" : "Overview",
   date = now,
-  range = "Day";
+  plannerPrefs = {
+    date: now,
+    anchor: now,
+    mode: "Overview",
+    days: 1,
+    hour: 8,
+    ...JSON.parse(localStorage.getItem("lifeos:planner-prefs") || "{}"),
+  };
 const project = (k) => state.projects.find((p) => p.id === k);
 const image = (p) =>
   p?.image ? '<img class="thumb" alt="" src="' + safe(p.image) + '">' : "";
@@ -46,7 +62,7 @@ const total = (field, skill) =>
   earned()
     .filter((r) => !skill || r.skill === skill)
     .reduce((n, r) => n + r[field], 0);
-function save() {
+function save(refresh = render) {
   try {
     localStorage.setItem("lifeos", JSON.stringify(state));
     syncBlocks();
@@ -57,7 +73,7 @@ function save() {
     alert("Storage is full. The last edit could not be saved.");
     state = JSON.parse(localStorage.getItem("lifeos")) || defaults;
   }
-  render();
+  refresh();
 }
 function button(t, a, k = "", extra = "") {
   return (
@@ -141,10 +157,6 @@ function dialog(title, html, submit) {
   };
   $("#modal").setAttribute("aria-labelledby", "editor-title");
   $("#form h2").id = "editor-title";
-  $("#form").classList.toggle(
-    "task-editor",
-    title === "Edit task" || title === "New task",
-  );
   $("#modal").showModal();
 }
 async function picture(file) {
@@ -202,58 +214,74 @@ function projectForm(p) {
   );
 }
 const priorities = ["None", "Low", "Medium", "High", "Goal"];
-function taskForm(t) {
-  const p = t?.project ?? (project(view)?.id || "");
-  dialog(
-    t ? "Edit task" : "New task",
-    field("title", "Title", "text", t?.title, "required") +
-      image(project(p)) +
-      select(
-        "project",
-        "Project",
-        [["", "Personal"], ...state.projects.map((p) => [p.id, p.name])],
-        p,
-      ) +
-      field(
-        "date",
-        "Planned date",
-        "date",
-        t?.date ?? (view === "Inbox" ? "" : date),
-      ) +
-      "<task-date-picker></task-date-picker>" +
-      field("time", "Start time", "time", t?.time) +
-      field(
-        "minutes",
-        "Duration (minutes)",
-        "number",
-        t?.minutes || state.config?.task || 30,
-        'min="1" required',
-      ) +
-      select(
-        "priority",
-        "Priority",
-        priorities.map((x) => [x, x]),
-        t?.priority || "None",
-      ) +
-      area("notes", "Description", t?.notes) +
-      field("tags", "Tags", "text", t?.tags) +
-      field("location", "Location", "text", t?.location) +
-      extraTaskFields(t) +
-      area(
-        "children",
-        "Subtasks (one per line)",
-        t?.children.map((s) => s.title).join("\n"),
-      ),
-    async (f) => {
+function taskForm(t, trigger, period) {
+  const anchor =
+    trigger ||
+    document.querySelector('[data-act="add"]') ||
+    document.querySelector("main header");
+  const initial = {
+    title: t?.title || "",
+    project: t?.project ?? project(view)?.id ?? "",
+    date:
+      t?.date ??
+      (period
+        ? period.kind === "day"
+          ? period.value
+          : ""
+        : ["Planner", "Upcoming", "Inbox"].includes(view) || project(view)
+          ? ""
+          : date),
+    period: t?.period || period || null,
+    deadline: t?.deadline || "",
+    time: t?.time || "",
+    minutes: t?.minutes || state.config?.task || 30,
+    priority: t?.priority || "None",
+    repeat: t?.repeat || "None",
+    scope: "one",
+    notes: t?.notes || "",
+    tags: t?.tags || "",
+    location: t?.location || "",
+    children: t?.children.map((s) => s.title).join("\n") || "",
+    completed: !!t?.done,
+    trashed: !!t?.trashed,
+    file: t?.file,
+  };
+  openComposer({
+    anchor,
+    projects: state.projects,
+    editing: !!t,
+    initial,
+    weekStart: plannerPrefs.weekStart,
+    advance: advanceDate,
+    onTrash() {
+      if (t) {
+        t.trashed = !t.trashed;
+        save();
+      }
+    },
+    async onCommit(f) {
+      if (!f.title.trim()) throw Error("Enter a task title");
+      if (f.time && !f.date) throw Error("Choose a date for this time");
+      if (!Number.isFinite(+f.minutes) || +f.minutes < 1)
+        throw Error("Enter a positive duration");
       let file = f.removeFile ? null : t?.file;
       if (f.attachment?.size) {
         if (f.attachment.size > 1000000)
           throw Error("Choose a file under 1 MB");
         file = { name: f.attachment.name, data: await readFile(f.attachment) };
       }
-      delete f.attachment;
+      const {
+        attachment,
+        removeFile,
+        trashed,
+        completed,
+        period: periodToKeep,
+        ...fields
+      } = f;
       const next = {
-        ...f,
+        ...fields,
+        title: f.title.trim(),
+        minutes: String(f.minutes),
         file,
         id: t?.id || id(),
         done: t?.done || false,
@@ -266,14 +294,24 @@ function taskForm(t) {
             done: t?.children.find((x) => x.title === title)?.done || false,
           })),
       };
-      if (next.time && !next.date) throw Error("Choose a date for this time");
+
+      if (
+        !next.date &&
+        ["week", "month", "someday"].includes(periodToKeep?.kind)
+      )
+        applyPlan(next, periodToKeep);
       if (t) {
+        if (next.date || !next.period) delete t.period;
         if (f.scope === "series") editFollowing(t, next);
         Object.assign(t, next);
-        if (t.done !== Boolean(f.completed)) complete(t);
+        if (t.done !== Boolean(completed)) {
+          complete(t);
+          return;
+        }
       } else state.tasks.push(next);
+      save();
     },
-  );
+  });
 }
 function complete(t) {
   t.done = !t.done;
@@ -390,192 +428,6 @@ function agenda() {
     "</div>"
   );
 }
-function shift(n) {
-  let d = new Date(date + "T12:00");
-  if (range === "Month") {
-    d.setDate(1);
-    d.setMonth(d.getMonth() + n);
-  } else
-    d.setDate(d.getDate() + n * (range === "Week" ? 7 : parseInt(range) || 1));
-  date = day(d);
-  if (view === "Today" || view === "Overview") view = "Agenda";
-  render();
-}
-// Local calendar coordinates: minutes since midnight; one shared scale across days.
-function calendar() {
-  const first = new Date(date + "T12:00"),
-    month = range === "Month",
-    count = month
-      ? new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
-      : range === "Week"
-        ? 7
-        : parseInt(range) || 1;
-  if (month) first.setDate(1);
-  const days = Array.from({ length: count }, (_, i) => {
-    const d = new Date(first);
-    d.setDate(d.getDate() + i);
-    return {
-      d,
-      key: day(d),
-      tasks: state.tasks
-        .filter((t) => !t.trashed && t.date === day(d) && t.time)
-        .sort((a, b) => a.time.localeCompare(b.time)),
-    };
-  });
-  const mins = (t) =>
-    Number(t.time.slice(0, 2)) * 60 + Number(t.time.slice(3, 5));
-  const all = days.flatMap((d) => d.tasks);
-  const start = Math.min(8, ...all.map((t) => Math.floor(mins(t) / 60))),
-    end = Math.min(
-      24,
-      Math.max(
-        19,
-        ...all.map((t) => Math.ceil((mins(t) + Number(t.minutes)) / 60)),
-      ),
-    );
-  const hours = Array.from({ length: end - start }, (_, i) => start + i);
-  const time = (n) =>
-    String(Math.floor(n / 60)).padStart(2, "0") +
-    ":" +
-    String(n % 60).padStart(2, "0");
-  function block(t, pos = "") {
-    const p = project(t.project),
-      color = /^#[0-9a-f]{6}$/i.test(p?.color) ? p.color : "var(--accent)";
-    const name =
-      t.time +
-      " · " +
-      t.title +
-      " · " +
-      t.minutes +
-      " min" +
-      (p ? " · " + p.name : "");
-    return button(
-      '<span class="block-title">' +
-        image(p) +
-        safe(t.title) +
-        '</span><span class="block-time">' +
-        t.time +
-        " · " +
-        Number(t.minutes) +
-        "m</span>",
-      "edit",
-      t.id,
-      'class="time-block" aria-label="' +
-        safe(name) +
-        '" title="' +
-        safe(name) +
-        '" style="--project:' +
-        color +
-        ";" +
-        pos +
-        '"',
-    );
-  }
-  // Give simultaneous events their own lanes until the overlap group clears.
-  function timed(tasks) {
-    let result = "",
-      group = [],
-      ends = [];
-    const flush = () => {
-      const width = 100 / ends.length;
-      for (const { t, lane, at, duration } of group)
-        result += block(
-          t,
-          "top:calc(" +
-            (at - start * 60) / 60 +
-            " * var(--hour));height:calc(" +
-            duration / 60 +
-            " * var(--hour));left:calc(" +
-            lane * width +
-            "% + 2px);width:calc(" +
-            width +
-            "% - 4px)",
-        );
-      group = [];
-      ends = [];
-    };
-    for (const t of tasks) {
-      const at = mins(t),
-        duration = Math.min(1440 - at, Math.max(1, Number(t.minutes) || 30));
-      if (ends.length && Math.max(...ends) <= at) flush();
-      let lane = ends.findIndex((x) => x <= at);
-      if (lane < 0) lane = ends.length;
-      ends[lane] = at + duration;
-      group.push({ t, lane, at, duration });
-    }
-    if (group.length) flush();
-    return result;
-  }
-  const grid = month
-    ? '<div class="calendar-scroll"><div class="month-board">' +
-      ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        .map((x) => "<b>" + x + "</b>")
-        .join("") +
-      days
-        .map(
-          ({ d, key, tasks }, i) =>
-            '<div class="slot month-day" data-date="' +
-            key +
-            '" style="' +
-            (!i ? "grid-column:" + (((d.getDay() + 6) % 7) + 1) : "") +
-            '"><strong>' +
-            d.getDate() +
-            "</strong>" +
-            tasks.map((t) => block(t)).join("") +
-            "</div>",
-        )
-        .join("") +
-      "</div></div>"
-    : '<div class="calendar-scroll"><div class="time-board" style="--days:' +
-      count +
-      '"><div class="time-axis"><div class="date-cap">Local</div>' +
-      hours.map((h) => "<time>" + time(h * 60) + "</time>").join("") +
-      "</div>" +
-      days
-        .map(
-          ({ key, d, tasks }) =>
-            '<div><div class="date-cap">' +
-            safe(
-              d.toLocaleDateString(undefined, {
-                weekday: "short",
-                day: "numeric",
-              }),
-            ) +
-            '</div><div class="day-column">' +
-            hours
-              .map(
-                (h) =>
-                  '<div class="slot hour" data-hour="' +
-                  h +
-                  '" data-date="' +
-                  key +
-                  '"></div>',
-              )
-              .join("") +
-            '<div class="event-layer">' +
-            timed(tasks) +
-            "</div></div></div>",
-        )
-        .join("") +
-      "</div></div>";
-  return (
-    '<section class="card calendar-card"><div class="bar calendar-head"><h2>Calendar</h2>' +
-    button("‹", "prev") +
-    button("Today", "reset") +
-    button("›", "next") +
-    '<select aria-label="Calendar range" id="range">' +
-    ["Day", "2 days", "3 days", "4 days", "5 days", "6 days", "Week", "Month"]
-      .map(
-        (v) =>
-          "<option " + (range === v ? "selected" : "") + ">" + v + "</option>",
-      )
-      .join("") +
-    "</select></div>" +
-    googleAgenda() +
-    grid +
-    "</section>"
-  );
-}
 function meter(label, xp, limit) {
   const value = xp % limit;
   return (
@@ -673,22 +525,126 @@ function habits() {
       .join("")
   );
 }
+let previousView;
+const viewFromUrl = () => {
+  try {
+    return decodeURIComponent(location.hash.slice(1));
+  } catch {
+    return "";
+  }
+};
+if (viewFromUrl()) view = viewFromUrl();
+window.addEventListener("popstate", () => {
+  view = viewFromUrl() || "Overview";
+  previousView = view;
+  render();
+});
 function render() {
+  if (view !== previousView) {
+    if (previousView && viewFromUrl() !== view)
+      history.pushState(null, "", "#" + encodeURIComponent(view));
+    previousView = view;
+  }
   document.documentElement.classList.toggle("black", state.theme === "Black");
   renderSidebar({
     view,
     projects: state.projects,
-    count: state.tasks.filter((t) => !t.date && !t.done && !t.trashed).length,
+    count: state.tasks.filter(
+      (t) => plan(t).kind === "unscheduled" && !t.done && !t.trashed,
+    ).length,
     theme: state.theme,
     onTheme: toggleTheme,
     onProject: () => projectForm(),
     lists: listFilters,
   });
   document.documentElement.dataset.effects = state.config?.effect || "on";
+  const specialized =
+    ["Planner", "Upcoming", "Inbox"].includes(view) || !!project(view);
+  const screen = $("#screen");
+  if (specialized) {
+    if (!screen.querySelector("#workspace"))
+      screen.innerHTML =
+        '<div class="hero ws-hero"><h1></h1></div><div id="workspace"></div>';
+    screen.querySelector("h1").textContent = project(view)?.name || view;
+    workspace($("#workspace"), {
+      view,
+      prefs: plannerPrefs,
+      tasks: state.tasks,
+      projects: state.projects,
+      events: visibleEvents(),
+      edit: taskForm,
+      complete,
+      projectEdit: projectForm,
+      pref(changes) {
+        Object.assign(plannerPrefs, changes);
+        if ((changes.date || changes.days) && Object.keys(overlayPrefs).length)
+          void refreshOverlays();
+        localStorage.setItem(
+          "lifeos:planner-prefs",
+          JSON.stringify(plannerPrefs),
+        );
+        render();
+      },
+      quick(title, period, projectId) {
+        const t = {
+          id: id(),
+          title,
+          project: projectId || "",
+          priority: "None",
+          minutes: String(state.config?.task || 30),
+          repeat: "None",
+          done: false,
+          children: [],
+        };
+        applyPlan(t, period);
+        state.tasks.push(t);
+        save();
+      },
+      patch(t, changes) {
+        Object.assign(t, changes);
+        save();
+      },
+      move(t, period, time) {
+        const before = plan(t),
+          previousTime = t.time;
+        applyPlan(t, period, time);
+        save();
+        document.getElementById("plan-undo")?.remove();
+        const undo = document.createElement("button");
+        undo.id = "plan-undo";
+        undo.textContent = "Task moved · Undo";
+        undo.onclick = () => {
+          const record = state.tasks.find((x) => x.id === t.id);
+          if (record) {
+            applyPlan(record, before, previousTime);
+            save();
+          }
+          undo.remove();
+        };
+        document.body.append(undo);
+        setTimeout(() => undo.remove(), 6000);
+      },
+      schedule(t) {
+        view = "Planner";
+        plannerPrefs.date = t.date || now;
+        render();
+        taskForm(t, document.querySelector(".ws-hero"));
+      },
+      calendars() {
+        view = "Calendar accounts";
+        render();
+        document.querySelector("[data-act=google]")?.click();
+      },
+    });
+    tick();
+    return;
+  }
   let body =
     view === "Design system"
       ? "<lifeos-showcase></lifeos-showcase>"
-      : extendedPage();
+      : view === "Calendar accounts"
+        ? googleSettings() + button("Back to Planner", "nav", "Planner")
+        : extendedPage();
   if (body !== null) {
   } else if (view === "openGym")
     body =
@@ -756,16 +712,17 @@ function render() {
       view === "Overview"
         ? '<div class="grid desk"><div class="agenda-stack">' +
           agenda() +
+          "</div><div>" +
           summary() +
+          button("Open Planner", "nav", "Planner") +
           "</div>" +
-          calendar() +
           '</div><section class="review-grid"><div>' +
           fitnessSummary() +
           '</div><div class="card"><h2>Habits</h2>' +
           habits() +
           "</div></section>" +
           contentHub()
-        : '<div class="grid">' + agenda() + calendar() + "</div>";
+        : agenda();
   if (view === "Design system" && $("#screen lifeos-showcase")) {
     tick();
     return;
@@ -795,7 +752,6 @@ document.addEventListener("click", (e) => {
       view = k;
       if (k === "Today") {
         date = now;
-        range = "Day";
       }
       render();
       break;
@@ -806,10 +762,10 @@ document.addEventListener("click", (e) => {
       projectForm(project(k));
       break;
     case "edit":
-      taskForm(t);
+      taskForm(t, b);
       break;
     case "add":
-      taskForm();
+      taskForm(undefined, b);
       break;
     case "complete":
       complete(t);
@@ -817,18 +773,6 @@ document.addEventListener("click", (e) => {
     case "sub":
       t.children[b.dataset.i].done = b.checked;
       save();
-      break;
-    case "reset":
-      view = "Today";
-      date = now;
-      range = "Day";
-      render();
-      break;
-    case "prev":
-      shift(-1);
-      break;
-    case "next":
-      shift(1);
       break;
     case "diary":
       state.diary[now] = $("[name=entry]").value;
@@ -885,96 +829,81 @@ document.addEventListener("click", (e) => {
     }
   }
 });
-document.addEventListener("change", (e) => {
-  if (e.target.id === "range") {
-    range = e.target.value;
-    render();
-  }
-});
-document.addEventListener("dragstart", (e) => {
-  let r = e.target.closest("[data-task]");
-  if (r) e.dataTransfer.setData("text/plain", r.dataset.task);
-});
-document.addEventListener("dragover", (e) => {
-  if (e.target.closest(".slot")) e.preventDefault();
-});
-document.addEventListener("drop", (e) => {
-  let slot = e.target.closest(".slot");
-  if (!slot) return;
-  e.preventDefault();
-  let t = state.tasks.find(
-    (t) => t.id === e.dataTransfer.getData("text/plain"),
-  );
-  if (t) {
-    t.date = slot.dataset.date;
-    t.time = slot.dataset.hour
-      ? slot.dataset.hour.padStart(2, "0") + ":00"
-      : t.time || "09:00";
-    save();
-  }
-});
 function toggleTheme() {
   state.theme = state.theme === "Light" ? "Black" : "Light";
   save();
 }
 
-function tick() {
-  let t = state.timer;
-  let left = t.end
-    ? Math.max(0, Math.ceil((t.end - Date.now()) / 1000))
-    : t.left;
-  $("#timer").textContent =
-    t.mode +
-    " · " +
-    Math.floor(left / 60) +
-    ":" +
-    String(left % 60).padStart(2, "0");
-}
-$("#timer").onclick = () => {
-  let t = state.timer;
-  dialog(
-    "Focus timer",
-    select(
-      "mode",
-      "Mode",
-      ["Focus", "Break", "Long break"].map((s) => [s, s]),
-      t.mode,
-    ) +
-      select(
-        "task",
-        "Link a task",
-        [
-          ["", "No task"],
-          ...state.tasks
-            .filter((t) => !t.done && !t.trashed)
-            .map((t) => [t.id, t.title]),
-        ],
-        t.task || "",
-      ) +
-      select("action", "Timer", [
-        [t.end ? "pause" : "start", t.end ? "Pause" : "Start / resume"],
-        ["reset", "Reset"],
-      ]),
-    (f) => {
-      let seconds =
-        state.config?.durations?.[f.mode] * 60 ||
-        { Focus: 1500, Break: 300, "Long break": 900 }[f.mode];
-      let left =
-        f.mode === t.mode
-          ? t.end
-            ? Math.max(0, Math.ceil((t.end - Date.now()) / 1000))
-            : t.left
-          : seconds;
-      state.timer = {
-        task: f.task,
-        mode: f.mode,
-        left: f.action === "reset" ? seconds : left,
-        end:
-          f.action === "start" ? Date.now() + (left || seconds) * 1000 : null,
-      };
-    },
+const defaultFocusMinutes = { Focus: 25, Break: 5, "Long break": 15 };
+function focusMinutes(mode) {
+  return (
+    Number(state.config?.durations?.[mode]) || defaultFocusMinutes[mode] || 25
   );
-};
+}
+function remaining(t) {
+  return t.end
+    ? Math.max(0, Math.ceil((t.end - Date.now()) / 1000))
+    : Math.max(0, t.left);
+}
+function timerAction(action, value) {
+  const timer = state.timer;
+  const seconds = remaining(timer);
+  if (action === "toggle") {
+    if (timer.end && seconds > 0) {
+      timer.end = null;
+      timer.left = seconds;
+    } else {
+      timer.left = seconds || focusMinutes(timer.mode) * 60;
+      timer.end = Date.now() + timer.left * 1000;
+    }
+  } else if (action === "link") {
+    timer.task = value;
+  } else {
+    if (action === "mode") timer.mode = value;
+    if (action === "duration") {
+      state.config ??= {};
+      state.config.durations = {
+        ...state.config.durations,
+        [timer.mode]: value,
+      };
+    }
+    timer.left = focusMinutes(timer.mode) * 60;
+    timer.end = null;
+  }
+  save(tick);
+}
+function tick() {
+  if (state.timer.end && remaining(state.timer) === 0) {
+    state.timer.end = null;
+    state.timer.left = 0;
+    const message = state.timer.mode + " complete";
+    let notice = document.getElementById("timer-notice");
+    if (!notice) {
+      notice = document.createElement("div");
+      notice.id = "timer-notice";
+      notice.setAttribute("role", "status");
+      document.body.append(notice);
+    }
+    notice.textContent = message;
+    setTimeout(() => notice.remove(), 6500);
+    if (window.Notification?.permission === "granted")
+      new Notification(message);
+    save(tick);
+    return;
+  }
+  renderFocus({
+    timer: state.timer,
+    remaining: remaining(state.timer),
+    minutes: focusMinutes(state.timer.mode),
+    tasks: state.tasks,
+    act: timerAction,
+  });
+}
+window.addEventListener("focus", tick);
+window.addEventListener("pageshow", tick);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) tick();
+});
 document.addEventListener("keydown", (e) => {
   if (
     e.key.toLowerCase() === "c" &&
@@ -989,6 +918,7 @@ document.addEventListener("keydown", (e) => {
   }
 });
 let overlays = {};
+let overlayPrefs = JSON.parse(localStorage.getItem("lifeos:calendars") || "{}");
 
 function fitnessSummary() {
   const latest = Object.entries(state.receipts)
@@ -1042,23 +972,18 @@ function googleSettings() {
   );
 }
 
-function googleAgenda() {
-  const entries = Object.values(overlays)
-    .flat()
-    .filter(
-      (e) =>
-        (e.start?.length === 10 ? e.start : day(new Date(e.start))) === date,
-    );
-  return entries
-    .map(
-      (e) =>
-        '<p class="pill">Calendar · ' +
-        safe(e.title) +
-        " · " +
-        safe(e.start) +
-        "</p>",
-    )
-    .join("");
+function visibleEvents() {
+  return Object.entries(overlays).flatMap(([calendar, events]) =>
+    events
+      .filter(
+        (e) => !e.lifeosId || !state.tasks.some((t) => t.id === e.lifeosId),
+      )
+      .map((e) => ({
+        ...e,
+        uid: calendar + ":" + e.id,
+        color: overlayPrefs[calendar]?.color,
+      })),
+  );
 }
 document.addEventListener("click", async (e) => {
   if (e.target.dataset.act !== "google") return;
@@ -1074,6 +999,8 @@ document.addEventListener("click", async (e) => {
         (c) =>
           '<label><span><input type="checkbox" data-overlay="' +
           safe(c.id) +
+          '" data-color="' +
+          safe(c.color) +
           '" ' +
           (overlays[c.id] ? "checked" : "") +
           "> " +
@@ -1090,14 +1017,19 @@ document.addEventListener("change", async (e) => {
   if (!key) return;
   if (!e.target.checked) {
     delete overlays[key];
+    delete overlayPrefs[key];
+    localStorage.setItem("lifeos:calendars", JSON.stringify(overlayPrefs));
     return;
   }
   try {
-    const data = await (
-      await fetch("/google/events?id=" + encodeURIComponent(key))
-    ).json();
+    const data = await (await fetch(overlayURL(key))).json();
     if (!data.events) throw Error(data.error || "Reconnect your account");
-    if (e.target.checked) overlays[key] = data.events;
+    if (e.target.checked) {
+      overlays[key] = data.events;
+      overlayPrefs[key] = { color: e.target.dataset.color };
+      localStorage.setItem("lifeos:calendars", JSON.stringify(overlayPrefs));
+      if (view === "Planner") render();
+    }
   } catch (err) {
     e.target.checked = false;
     alert(err.message);
@@ -1159,61 +1091,6 @@ function readFile(file) {
     f.readAsDataURL(file);
   });
 }
-function extraTaskFields(t) {
-  return (
-    (t
-      ? button(
-          t.trashed ? "Restore task" : "Move to Trash",
-          "trash",
-          t.id,
-          'type="button"',
-        )
-      : "") +
-    select(
-      "repeat",
-      "Repeat",
-      ["None", "Daily", "Weekdays", "Weekly", "Monthly"].map((v) => [v, v]),
-      t?.repeat || "None",
-    ) +
-    (t
-      ? select(
-          "scope",
-          "Apply edits to",
-          [
-            ["one", "This occurrence"],
-            ["series", "This and following occurrences"],
-          ],
-          "one",
-        )
-      : "") +
-    '<output id="nextRepeat"></output>' +
-    field("attachment", "Attach a file", "file", "") +
-    (t?.file
-      ? '<a download="' +
-        safe(t.file.name) +
-        '" href="' +
-        safe(t.file.data) +
-        '">Download ' +
-        safe(t.file.name) +
-        '</a><label><span><input name="removeFile" type="checkbox"> Remove attachment</span></label>'
-      : "") +
-    (t
-      ? '<label><span><input name="completed" type="checkbox" ' +
-        (t.done ? "checked" : "") +
-        "> Completed</span></label>"
-      : "")
-  );
-}
-document.addEventListener("input", () => {
-  const out = $("#nextRepeat");
-  if (!out) return;
-  const f = $("#form");
-  out.textContent =
-    f.repeat.value !== "None" && f.date.value
-      ? "Next occurrence · " + advanceDate(f.date.value, f.repeat.value)
-      : "";
-});
-
 function contentHub() {
   return (
     '<section class="card hub"><h2>Progress</h2><div class="bar">' +
@@ -1653,16 +1530,18 @@ function inList(t) {
   if (t.trashed) return false;
   if (view === "Tomorrow") return t.date === day(tomorrow);
   if (view === "Upcoming") return t.date > now;
-  if (view === "Someday") return !t.date && !t.done;
+  if (view === "Someday") return plan(t).kind === "someday" && !t.done;
   if (view === "Done") return t.done;
-  if (view === "This Month") return t.date?.slice(0, 7) === now.slice(0, 7);
+  if (view === "This Month")
+    return plan(t).value?.slice(0, 7) === now.slice(0, 7);
   if (view === "This Week" || view === "Next 7 Days") {
     const first = new Date(now + "T12:00");
     if (view === "This Week")
       first.setDate(first.getDate() - ((first.getDay() + 6) % 7));
     const last = new Date(first);
     last.setDate(first.getDate() + 6);
-    return t.date >= day(first) && t.date <= day(last);
+    const v = plan(t).value;
+    return v >= day(first) && v <= day(last);
   }
   return true;
 }
@@ -1679,6 +1558,19 @@ function findTask() {
       const t = state.tasks.find((t) => t.id === id);
       if (t) taskForm(t);
     },
+    [
+      ["Create task", () => taskForm()],
+      ["Play / pause focus timer", () => timerAction("toggle")],
+      ...["Planner", "Upcoming", "Inbox", "Today", "Projects", "openGym"].map(
+        (name) => [
+          "Open " + name,
+          () => {
+            view = name;
+            render();
+          },
+        ],
+      ),
+    ],
   );
 }
 document.addEventListener("keydown", (e) => {
@@ -2060,7 +1952,44 @@ if (window.lifeosHosted) {
   void refreshTraining();
   setInterval(refreshTraining, 30000);
 }
+try {
+  await backupLegacy(localStorage.getItem("lifeos"));
+} catch (err) {
+  console.warn("Could not save the pre-upgrade recovery snapshot", err);
+}
+function overlayURL(id) {
+  const first = new Date(plannerPrefs.date + "T00:00:00"),
+    end = new Date(first);
+  end.setDate(first.getDate() + plannerPrefs.days);
+  return (
+    "/google/events?" +
+    new URLSearchParams({
+      id,
+      from: first.toISOString(),
+      to: end.toISOString(),
+    })
+  );
+}
+async function refreshOverlays() {
+  await Promise.all(
+    Object.keys(overlayPrefs).map(async (k) => {
+      try {
+        const url = overlayURL(k);
+        const r = await fetch(url);
+        const data = await r.json();
+        if (r.ok && data.events && overlayPrefs[k] && overlayURL(k) === url)
+          overlays[k] = data.events;
+      } catch {}
+    }),
+  );
+  if (view === "Planner") render();
+}
 render();
+if (Object.keys(overlayPrefs).length) void refreshOverlays();
+setInterval(() => {
+  if (view === "Planner" && Object.keys(overlayPrefs).length)
+    void refreshOverlays();
+}, 60000);
 setInterval(tick, 1000);
 
 document.addEventListener("click", (e) => {
@@ -2079,5 +2008,26 @@ document.addEventListener("click", (e) => {
       ),
       (f) => (t.project = f.project),
     );
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (
+    e.ctrlKey ||
+    e.altKey ||
+    e.metaKey ||
+    e.target.closest(
+      "input,textarea,select,[contenteditable=true],[role=dialog],dialog",
+    ) ||
+    document.querySelector("[role=dialog][data-state=open]")
+  )
+    return;
+  const target = { u: "Upcoming", p: "Planner", i: "Inbox" }[
+    e.key.toLowerCase()
+  ];
+  if (target) {
+    e.preventDefault();
+    view = target;
+    render();
   }
 });

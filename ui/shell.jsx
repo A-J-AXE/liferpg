@@ -1,3 +1,8 @@
+export { workspace } from "./workspaces";
+export { backupLegacy } from "./planning-backup.mjs";
+export { plan, applyPlan } from "./planning.mjs";
+export { openComposer } from "./compact-composer";
+export { renderFocus } from "./compact-timer";
 export { searchTasks } from "./planner-controls";
 import React, { useEffect } from "react";
 import { createRoot } from "react-dom/client";
@@ -48,6 +53,8 @@ const groups = [
       [PanelsTopLeft, "Overview"],
       [Inbox, "Inbox"],
       [CalendarDays, "Today"],
+      [CalendarDays, "Planner"],
+      [Layers2, "Upcoming"],
       [ListChecks, "Tasks"],
       [Folders, "Projects"],
     ],
@@ -131,7 +138,9 @@ function Navigation({
                   <details className="more-views">
                     <summary>More views</summary>
                     <SidebarMenu>
-                      {lists.map((x) => item(CalendarDays, x))}
+                      {lists
+                        .filter((x) => x !== "Upcoming")
+                        .map((x) => item(CalendarDays, x))}
                     </SidebarMenu>
                   </details>
                 )}

@@ -1,0 +1,10 @@
+# Task planning precision
+Existing task IDs, project IDs, completion receipts, attachments, recurrence links and children remain authoritative. Exact scheduled work retains the existing local date, time and minutes. A dated task without time is a day plan. An undated task without a period is Inbox. The optional period field stores a week start, a YYYY-MM month, or explicit Someday. Week and month keys label a period. They never populate the scheduled date or time. A deadline is an independent civil date.
+
+Overview assigns each task to the first matching column in display order: Today, This Week, Next Week, This Month, Next Month, Someday. A month-level task cannot match a narrower column. A week-level task can appear in its month's board based on its week start. The day board shows only day and exact-time records. An overdue or distant task outside the current columns remains available in its project and the appropriate period board.
+
+Civil-date arithmetic uses local noon and calendar-day increments through daylight-saving boundaries. External timed events are converted to local time and clipped per day. All-day dates keep their calendar meaning and their end is exclusive.
+
+Compatibility is read-through. Opening a legacy record performs no rewrite. Moving one task updates only its planning fields. A new client can read an older workspace immediately. For rollback after editing new periods, export the current workspace and restore the pre-change backup in the same profile or server volume before starting the older build. Older clients cannot interpret an undated period and will show it as unscheduled.
+
+A profile with existing records saves its first raw workspace to IndexedDB database lifeos-recovery, store snapshots, key before-periods. For local rollback, export current changes, restore that stored JSON as the lifeos localStorage value and reopen the previous version. Hosted restore must also use the server-volume backup with clients stopped. There is no server schema migration.
