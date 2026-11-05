@@ -627,6 +627,7 @@ function entityContext() {
       ...h,
       streak: streak(h),
       checked: !!state.receipts[h.id + now],
+      checkedOn: (date) => Boolean(state.receipts[h.id + date]),
     })),
     battles: (state.battles || []).map((h) => ({
       ...h,
@@ -1197,7 +1198,7 @@ document.addEventListener("click", (e) => {
             "Skill",
             state.skills.map((s) => [s, s]),
           ),
-        (f) => state.habits.push({ ...f, id: id() }),
+        (f) => state.habits.push({ ...f, id: id(), createdOn: now }),
       );
       break;
     case "check":
