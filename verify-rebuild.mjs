@@ -67,7 +67,7 @@ try {
 
     await page.keyboard.press("Control+k");
     await page.getByRole("dialog").waitFor();
-    const search = page.getByRole("textbox", { name: "Search pages" });
+    const search = page.locator('[data-slot="command-input"]');
     await search.fill("Skills");
     await page.getByRole("option", { name: "Skills" }).click();
     assert.equal(new URL(page.url()).hash, "#/skills");
