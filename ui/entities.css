@@ -194,12 +194,22 @@
 }
 .block-project-icon {
   display: inline-flex;
-  align-self: center;
+  align-self: flex-start;
+  align-items: center;
+  flex: none;
+  height: 16px;
 }
 .block-project-icon svg,
 .block-project-icon img {
   width: 13px;
   height: 13px;
+}
+.ws-child-block .block-project-icon {
+  height: 10px;
+}
+.ws-child-block .block-project-icon :is(svg, img) {
+  width: 10px;
+  height: 10px;
 }
 .legacy-subtree summary,
 .subtree-toggle {
